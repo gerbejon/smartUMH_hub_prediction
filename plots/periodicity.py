@@ -4,15 +4,23 @@ from astropy.timeseries import LombScargle
 import pandas as pd
 import numpy as np
 
-def _plot_acf(ts, lags=100):
+def _plot_acf(ts, lags=30, file_dir=None):
     # plot_acf(ts_all['Tables']['Quantity'], lags=100)
     plot_acf(ts, lags=lags)
-    plt.show()
+    plt.grid()
+    if file_dir is None:
+        plt.show()
+    else:
+        plt.savefig(file_dir)
 
-def _plot_pacf(ts, lags=100):
+def _plot_pacf(ts, lags=30, file_dir=None):
     # plot_acf(ts_all['Tables']['Quantity'], lags=100)
     plot_pacf(ts, lags=lags)
-    plt.show()
+    plt.grid()
+    if file_dir is None:
+        plt.show()
+    else:
+        plt.savefig(file_dir)
 
 def _plot_fft(ts):
     # Perform FFT
@@ -30,7 +38,7 @@ def _plot_fft(ts):
     plt.show()
 
 
-def _plot_lombscargle(timeseries, values, plot=True, title=''):
+def _plot_lombscargle(timeseries, values, plot=True, title='', file_dir=None):
 
     # Example: Generate irregular time series
     # irregular_time = df['timestamp'].values.astype('float64')
@@ -51,11 +59,15 @@ def _plot_lombscargle(timeseries, values, plot=True, title=''):
         # Plot the periodogram
         plt.figure(figsize=(10, 6))
         plt.plot(1 / frequency, power)
+        plt.xlim((0,10))
         plt.grid()
         plt.title(f"Lomb-Scargle Periodogram {title}")
         plt.xlabel("Period")
         plt.ylabel("Power")
-        plt.show()
+        if file_dir is None:
+            plt.show()
+        else:
+            plt.savefig(file_dir)
 
     df = pd.DataFrame({'frequency': frequency, 'power': power})
     df['period'] = 1 /df['frequency']

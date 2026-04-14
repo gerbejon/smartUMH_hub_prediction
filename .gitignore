@@ -1,0 +1,7 @@
+data
+.csv
+/prediction
+plots
+__pycache__
+zur_sim/plots
+zur_sim/data

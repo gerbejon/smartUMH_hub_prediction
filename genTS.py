@@ -1,3 +1,4 @@
+import os
 from datetime import timedelta, datetime
 import numpy as np
 
@@ -109,11 +110,60 @@ class genTS:
 # print(ts_index, ts_values)
 # plot_timeseries(ts_index, ts_values)
 import pandas as pd
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
+from plots.periodicity import _plot_lombscargle, _plot_acf, _plot_pacf
 gents = genTS()
 ts_all = gents.ts_all
 ts_all_clean = gents.ts_all_clean
 ts_index = gents.ts_index
+from workbench.store_sales import WORK_DIR
+
+def save_ts_plots(df):
+    import matplotlib.pyplot as plt
+    df.plot()
+    # plt.scatter(df)
+    plt.grid(True)
+    plt.savefig(os.path.join(WORK_DIR, 'ts_example.png'))
+    plt.show()
+
+    # df = _plot_lombscargle(df.index, df.clean)
+    from astropy.timeseries import LombScargle
+    import matplotlib.pyplot as plt
+    frequency, power = LombScargle(np.arange(0, len(df.index)), df.real).autopower()
+    plt.plot(frequency, power)
+    plt.title('Lomb-Scargle Periodogram')
+    plt.grid(True)
+    plt.savefig(os.path.join(WORK_DIR, 'ts_example_period.png'))
+    plt.show()
+
+    _plot_acf(df.real, 100, file_dir=f'{WORK_DIR}/ts_example_acf.png')
+    _plot_pacf(df.real, 100, file_dir=f'{WORK_DIR}/ts_example_pacf.png')
+
+
+def save_ts_diff_plots(df):
+    import matplotlib.pyplot as plt
+    df = df.diff().dropna()
+    df.plot()
+    # plt.scatter(df)
+    plt.grid(True)
+    plt.savefig(os.path.join(WORK_DIR, 'ts_diff_example.png'))
+    plt.show()
+
+    # df = _plot_lombscargle(df.index, df.clean)
+    from astropy.timeseries import LombScargle
+    import matplotlib.pyplot as plt
+    frequency, power = LombScargle(np.arange(0, len(df.index)), df.real).autopower()
+    plt.plot(frequency, power)
+    plt.title('Lomb-Scargle Periodogram')
+    plt.grid(True)
+    plt.savefig(os.path.join(WORK_DIR, 'ts_diff_example_period.png'))
+    plt.show()
+
+    _plot_acf(df.real, 100, file_dir=f'{WORK_DIR}/ts_diff_example_acf_diff.png')
+    plt.show()
+    _plot_pacf(df.real, 100, file_dir=f'{WORK_DIR}/ts_diff_example_pacf.png')
+    plt.show()
+
 if __name__ == '__main__':
     # ts_values, ts_index = genTS().gen_one_series()
     gents = genTS()
@@ -128,11 +178,29 @@ if __name__ == '__main__':
         ], columns= ts_index,
         index=['real', 'clean']
     ).transpose()
-    # plot_timeseries(ts_index, ts_all)
-    df.plot()
-    # plt.scatter(df)
-    plt.grid(True)
-    plt.show()
 
+    save_ts_plots(df)
+    save_ts_diff_plots(df)
+
+    # plot_timeseries(ts_index, ts_all)
+    # df.plot()
+    # # plt.scatter(df)
+    # plt.grid(True)
+    # plt.savefig(os.path.join(WORK_DIR, 'ts_example.png'))
+    # plt.show()
+    #
+    # # df = _plot_lombscargle(df.index, df.clean)
+    # from astropy.timeseries import LombScargle
+    # import matplotlib.pyplot as plt
+    # frequency, power = LombScargle(np.arange(0,len(df.index)), df.real).autopower()
+    # plt.plot(frequency, power)
+    # plt.title('Lomb-Scargle Periodogram')
+    # plt.grid(True)
+    # plt.savefig(os.path.join(WORK_DIR, 'ts_example_period.png'))
+    # plt.show()
+    #
+    #
+    # _plot_acf(df.clean, 100, file_dir=f'{WORK_DIR}/ts_example_acf_diff.png')
+    # _plot_pacf(df.clean, 100, file_dir=f'{WORK_DIR}/ts_example_pacf.png')
 
 
