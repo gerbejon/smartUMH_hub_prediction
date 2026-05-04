@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 import pandas as pd
 
@@ -11,7 +13,7 @@ import matplotlib.pyplot as plt
 
 if __name__ == '__main__':
     hub_distributions = []
-    date = '2026-01-1'
+    date = '2026-02'
     ds = DataSource()
     # df = ds.df.loc[ds.df.AnzFahrzeuge.notna()]
     df = ds.df
@@ -39,3 +41,4 @@ if __name__ == '__main__':
     # plt.xticks(rotation=20)
     plt.grid(True)
     plt.show()
+    df_dist.to_csv(os.path.join('data', 'hub_distribution.csv'))

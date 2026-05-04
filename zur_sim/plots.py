@@ -123,7 +123,6 @@ def create_frames_per_day(day='2026-01-01', kind=None):
 
 def create_video_frames_per_day(day='2026-01-01', kind=None):
     frames = sorted(glob.glob(f"{datadir}/plots/map_plot_{day}*.png"))
-
     with imageio.get_writer(os.path.join(datadir, 'plots', f"zurich_traffic_{kind}_{day}.mp4"),
                             fps=6) as writer:
         for frame in frames:
