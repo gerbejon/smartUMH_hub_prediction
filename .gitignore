@@ -5,5 +5,29 @@ plots
 __pycache__
 zur_sim/plots
 zur_sim/data
+<<<<<<< ml-models
+
+# virtual envs
+myenv/
+venv/
+.venv/
+env/
+
+# python build/cache artifacts
+*.pyc
+*.pyo
+*.egg-info/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# editor / OS
+.idea/
+.vscode/
+.DS_Store
+
+# local scratch artifacts
+some_plot.png
+=======
 *.png
 lightning_logs
+>>>>>>> master

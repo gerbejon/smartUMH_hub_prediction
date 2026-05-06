@@ -23,7 +23,7 @@ df = pd.read_csv(os.path.join(path, 'data.csv'))
 path = kagglehub.dataset_download("talhabu/us-regional-sales-data")
 print("Path to dataset files:", path)
 df = pd.read_csv(os.path.join(path, 'US_Regional_Sales_Data.csv'))
-df['OrderDate'] = pd.to_datetime(df['OrderDate'])
+df['OrderDate'] = pd.to_datetime(df['OrderDate'], format='%d/%m/%y')
 data = df[['_ProductID', 'OrderDate', '_StoreID', 'Discount Applied', 'Unit Price', 'Sales Channel', 'Order Quantity']]
 prod12 = data.query('_ProductID == 12')
 
@@ -65,7 +65,8 @@ for categ in set(df_all['Sub-Category']):
         data=df_tmp,
         # s=100  # Marker size
     )
-    plt.show()
+    plt.savefig("some_plot.png", dpi=300, bbox_inches="tight")
+    plt.close()
 
 # plot autocorrelation
 # from statsmodels.graphics.tsaplots import plot_acf

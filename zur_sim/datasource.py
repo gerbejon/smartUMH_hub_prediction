@@ -16,12 +16,14 @@ datadir = os.path.join(cwd, 'zur_sim/data/')
 class DataSource:
     def __init__(self):
         self.df = None
-        self.data_path = os.path.join(datadir, 'sid_dav_verkehrszaehlung_miv_od2031_{}.csv')
+        self.data_path = os.path.join(datadir, 'verkehrszaehlung_{}_clean.csv')
         self.year = '2026'
         self.load_data()
 
     def load_data(self):
         self.df = pd.read_csv(self.data_path.format(self.year))
+        for col in self.df.select_dtypes(include='object').columns:
+            self.df[col] = self.df[col].str.strip('"')
 
 
 
