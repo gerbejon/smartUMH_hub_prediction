@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from statsmodels.tsa.statespace.sarimax import SARIMAX
 
 # Example: Generate synthetic time series data
-date_range = pd.date_range(start='2020-01-01', periods=36, freq='M')
+date_range = pd.date_range(start='2020-01-01', periods=36, freq='ME')
 data = pd.DataFrame({
     'Date': date_range,
     'Value': np.sin(2 * np.pi * date_range.month / 12) + np.random.normal(0, 0.2, len(date_range))
