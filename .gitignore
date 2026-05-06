@@ -7,3 +7,4 @@ zur_sim/plots
 zur_sim/data
 *.png
 lightning_logs
+.idea

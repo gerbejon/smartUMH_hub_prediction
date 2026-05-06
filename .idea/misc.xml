@@ -3,5 +3,5 @@
   <component name="Black">
     <option name="sdkName" value="Python 3.10 (smartUMH)" />
   </component>
-  <component name="ProjectRootManager" version="2" project-jdk-name="Python 3.10 (smartUMH)" project-jdk-type="Python SDK" />
+  <component name="ProjectRootManager" version="2" project-jdk-name="SSH (sftp://ubuntu@160.85.253.150:22/home/ubuntu/.virtualenvs/smartUMH/bin/python) (2)" project-jdk-type="Python SDK" />
 </project>
