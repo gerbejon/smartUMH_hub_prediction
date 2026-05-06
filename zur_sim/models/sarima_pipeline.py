@@ -364,6 +364,7 @@ if __name__ == "__main__":
     forecast_df = pd.concat([
         forecast_df_hub1.forecast, df_hub1, forecast_df_hub2.forecast, df_hub2
     ], axis=1)
-    forecast_df.colnames = ['hub1_y_hat', 'hub1_y', 'hub2_y_hat', 'hub2_y']
+    forecast_df.sort_index(inplace=True)
+    forecast_df.columns = ['hub1_y_hat', 'hub1_y', 'hub2_y_hat', 'hub2_y']
 
     forecast_df.to_csv('../data/forecast_sarima.csv')
