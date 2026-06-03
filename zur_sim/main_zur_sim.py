@@ -11,17 +11,23 @@ from collections import Counter
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-if __name__ == '__main__':
+def main(hub_inds: tuple[str, str]):
+    folder_dir = os.path.join('data', '_'.join([str(hub_inds[0]), str(hub_inds[1]), date]))
+    print(folder_dir)
+    # print(os.path.abspath(os.path.join(folder_dir, 'hub_distribution.csv')))
+    # print(os.path.exists(os.path.abspath(os.path.join(folder_dir, 'hub_distribution.csv'))))
+
+    if not os.path.exists(os.path.abspath(folder_dir)):
+        os.mkdir(os.path.abspath(folder_dir))
+    elif os.path.exists(os.path.abspath(os.path.join(folder_dir, 'hub_distribution.csv'))):
+        return
     hub_distributions = []
-    date = '2026-02'
-    ds = DataSource()
-    # df = ds.df.loc[ds.df.AnzFahrzeuge.notna()]
-    df = ds.df
+
     # df.loc[ds.df.AnzFahrzeuge.isna(), 'AnzFahrzeuge'] = np.inf
     datetimes = df.loc[df.MessungDatZeit.str.startswith(date)].MessungDatZeit.unique()
-    for datetime in progressbar(datetimes):
+    for datetime in datetimes:
         df_tmp = df.loc[df.MessungDatZeit == datetime]
-        tm = TransitionMatrix(df_tmp, kind='nodecount')
+        tm = TransitionMatrix(df_tmp, kind='nodecount', target_ids=hub_inds)
 
         # tm = TransitionMatrix(df, kind='density')
         tm.main()
@@ -41,4 +47,21 @@ if __name__ == '__main__':
     # plt.xticks(rotation=20)
     plt.grid(True)
     plt.show()
-    df_dist.to_csv(os.path.join('data', 'hub_distribution.csv'))
+    df_dist.to_csv(os.path.join(folder_dir, 'hub_distribution.csv'))
+    return df_dist
+
+
+date = '2026-02'
+if __name__ == '__main__':
+    ds = DataSource()
+    df = ds.df
+    zsid = df.ZSID.unique()
+    hub_b = zsid[57]
+    print(len(zsid))
+    for hub_a in progressbar(zsid):
+
+        if hub_a == hub_b:
+            continue
+        else:
+            main((hub_a, hub_b))
+

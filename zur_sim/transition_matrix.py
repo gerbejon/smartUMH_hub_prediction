@@ -16,7 +16,7 @@ import contextily as cx
 import random
 
 class TransitionMatrix:
-    def __init__(self, df, kind = None):
+    def __init__(self, df, kind = None, target_ids: tuple[str, str] = None):
         if kind is None:
             print('please state underlying costcalculation: \n- vehicle count per node [nodecount]\n- density of vehicles [density]')
         elif kind == 'nodecount':
@@ -38,8 +38,11 @@ class TransitionMatrix:
         self.weight_distance = 0.5  # weight distance
         self.weight_traffic = 0.5  # weight traffic
         self.knn = 8
-        self.targets = (57,45)
-        print('using: {} and {} as Target hubs'.format( self.df.ZSID.iloc[self.targets[0]], self.df.ZSID.iloc[self.targets[1]]))
+        self.target_ids = target_ids
+        self.targets = tuple(np.where((self.df.ZSID.values == self.target_ids[0]) | (self.df.ZSID.values == self.target_ids[1]))[0])
+
+        # print('using: {} and {} as Target hubs'.format( target_ids[0], target_ids[1]))
+        # print('using: {} and {} as Target hubs'.format( self.df.ZSID.iloc[self.targets[0]], self.df.ZSID.iloc[self.targets[1]]))
         self.timestamp = str(self.df.MessungDatZeit.loc[0]).replace('T', ' ')
         if not os.path.exists(f'{cwd}/plots/{self.timestamp.split(" ")[0]}'):
             os.makedirs(f'{cwd}/plots/{self.timestamp.split(" ")[0]}')
@@ -66,7 +69,7 @@ class TransitionMatrix:
         if df is None:
             df = self.df
         # df = self.aggregate(self.df)
-        gdf = self.preprocesse(df)
+        gdf = self.preprocess(df)
         self.cost_matrix = self.create_cost_trans_matrix(gdf)
         self.transition_matrix = self.define_transition_limits(self.cost_matrix, knn=self.knn)
 
@@ -75,7 +78,7 @@ class TransitionMatrix:
         self.get_shortest_path(self.matrix, source, target, plot=plot)
 
 
-    def preprocesse(self, df):
+    def preprocess(self, df):
         df = df.loc[df[self.z_col].notna()]
         # df =  self.aggregate(df)
 
@@ -226,7 +229,7 @@ class TransitionMatrix:
                 zorder=5
             )
         for i, txt in enumerate(range(len(x))):
-            if i in self.targets:
+            if i in self.target_ids:
             # if True:
                 plt.text(x[i] + 0.3, y[i] + 0.3, str(self.nodes.index[i]))
         plt.title(self.timestamp)
@@ -238,9 +241,10 @@ class TransitionMatrix:
         fig.savefig(f'{cwd}/zur_sim/plots/{self.timestamp.split(" ")[0]}/sim_map_{self.timestamp.replace(" ", "_")}.png', dpi=300, bbox_inches="tight")
         # plt.show()
 
-    def sample_multiple(self, nr_samples=100, targets=None):
+    def sample_multiple(self, nr_samples=100, targets=None, plot=False):
         if targets is None:
             targets = self.targets
+
         samples = random.choices(self.raster.index, k=nr_samples)
         paths = []
         nodeNr = pd.Series(range(self.nodes.shape[0]), index=self.nodes.index)
@@ -254,7 +258,8 @@ class TransitionMatrix:
             coord_path = [(x0, y0)]
             coord_path.extend([(self.gdf["lon"].values[i], self.gdf["lat"].values[i]) for i in path])
             paths.append(coord_path)
-        self.plot(paths)
+        if plot:
+            self.plot(paths)
         return best_hub
 
 
