@@ -1,10 +1,17 @@
-from zur_sim.datasource import DataSource
+
+import socket
+if socket.gethostname() == 'berttrainer-large':
+    from datasource import DataSource
+    from plots import plot
+else:
+    from zur_sim.datasource import DataSource
+    from zur_sim.plots import plot
+
 import geopandas as gpd
 import numpy as np
 import pandas as pd
 from scipy.spatial.distance import cdist
 import networkx as nx
-from zur_sim.plots import plot
 
 ds = DataSource()
 df = ds.df

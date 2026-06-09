@@ -1,4 +1,13 @@
-from zur_sim.datasource import DataSource
+import socket
+if socket.gethostname() == 'berttrainer-large':
+    from datasource import DataSource
+    from plots import interactive_plot
+    from tools import aggreate
+else:
+    from zur_sim.datasource import DataSource
+    from zur_sim.plots import interactive_plot
+    from zur_sim.tools import aggreate
+
 import geopandas as gpd
 import numpy as np
 import pandas as pd
@@ -6,8 +15,7 @@ from scipy.interpolate import griddata
 from scipy.ndimage import gaussian_filter
 from scipy.stats import gaussian_kde
 import matplotlib.pyplot as plt
-from zur_sim.plots import interactive_plot
-from zur_sim.tools import aggreate
+
 
 class RasterCreater:
     def __init__(self, df, kde_bw=0.3):

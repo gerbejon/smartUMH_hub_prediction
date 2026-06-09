@@ -1,5 +1,9 @@
-from zur_sim.datasource import DataSource, datadir
-import pandas as pd
+import socket
+if socket.gethostname() == 'berttrainer-large':
+    from datasource import DataSource, datadir
+else:
+    from zur_sim.datasource import DataSource, datadir
+    import pandas as pd
 import geopandas as gpd
 import plotly.express as px
 import seaborn as sns
@@ -51,7 +55,7 @@ def interactive_plot(df, vmin=None, vmax=None, kind=None):
     fig.show(renderer="browser")
 
 
-def plot(df, vmin=None, vmax=None, kind=None):
+def plot(df, vmin=None, vmax=None, kind=None, node_labels=None):
     if vmax is None:
         vmax=df.AnzFahrzeuge.max()
     if vmin is None:

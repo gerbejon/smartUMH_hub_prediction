@@ -337,7 +337,7 @@ def prophet_pipeline(
     forecast_df = forecast_prophet(model, series_test, ds_test)
 
     # ── Step 5 — plot: train | true test | forecast ─────
-    plot_results(series_train, series_test, forecast_df)
+    # plot_results(series_train, series_test, forecast_df)
 
     # ── Step 6 — metrics ────────────────────────────────
     metrics = evaluate(series_test, forecast_df)
@@ -367,6 +367,15 @@ def get_example_ts() -> pd.Series:
     index = pd.date_range("2020-01-01", periods=n, freq="MS")
     return pd.Series(signal, index=index, name="value")
 
+def main_prophet(ts):
+    forecast_df, best_params, metrics = prophet_pipeline(
+        ts,
+        max_period=50,
+        changepoint_prior_scales=[0.01, 0.1, 0.5],
+        seasonality_prior_scales=[1.0, 10.0],
+        train_ratio=0.8,
+    )
+    return forecast_df, best_params, metrics
 
 if __name__ == "__main__":
 

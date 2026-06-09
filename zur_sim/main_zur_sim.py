@@ -2,9 +2,13 @@ import os
 
 import numpy as np
 import pandas as pd
-
-from zur_sim.datasource import DataSource
-from zur_sim.transition_matrix import TransitionMatrix
+import socket
+if socket.gethostname() == 'berttrainer-large':
+    from datasource import DataSource
+    from transition_matrix import TransitionMatrix
+else:
+    from zur_sim.datasource import DataSource
+    from zur_sim.transition_matrix import TransitionMatrix
 import geopandas as gpd
 from progressbar import progressbar
 from collections import Counter
@@ -47,18 +51,19 @@ def main(hub_inds: tuple[str, str]):
     # plt.xticks(rotation=20)
     plt.grid(True)
     plt.show()
-    df_dist.to_csv(os.path.join(folder_dir, 'hub_distribution.csv'))
+    # df_dist.to_csv(os.path.join(folder_dir, 'hub_distribution.csv'))
     return df_dist
 
 
-date = '2026-02'
+# date = '2026-02'
+date = '2026-01-01T12:00:00'
 if __name__ == '__main__':
     ds = DataSource()
     df = ds.df
     zsid = df.ZSID.unique()
     hub_b = zsid[57]
     print(len(zsid))
-    for hub_a in progressbar(zsid):
+    for hub_a in progressbar(zsid)[:1]:
 
         if hub_a == hub_b:
             continue

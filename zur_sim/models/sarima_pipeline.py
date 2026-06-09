@@ -297,7 +297,7 @@ def sarima_pipeline(
     forecast_df = forecast_sarima(fit, series_test)
 
     # ── Step 6 — plot: train | true test | forecast ─────
-    plot_results(series_train, series_test, forecast_df, plot_short=True)
+    # plot_results(series_train, series_test, forecast_df, plot_short=True)
 
     # ── Step 7 — metrics ────────────────────────────────
     metrics = evaluate(series_test, forecast_df)
@@ -334,6 +334,17 @@ def get_data():
     df_hub2 = df.iloc[:, 1].fillna(0)
     return df_hub1, df_hub2
 
+def main_sarima(ts):
+    forecast_df, best_params, metrics = sarima_pipeline(
+        ts,
+        max_period=50,
+        p_range=range(0, 5),
+        q_range=range(0, 5),
+        P_range=range(0, 2),
+        Q_range=range(0, 2),
+        train_ratio=0.8,
+    )
+    return forecast_df, best_params, metrics
 
 if __name__ == "__main__":
 

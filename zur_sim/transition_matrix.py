@@ -1,15 +1,21 @@
 import os.path
 import sys
-
+import socket
 import geopandas as gpd
 import numpy as np
 import pandas as pd
 from progressbar import progressbar
-from zur_sim.datasource import DataSource, cwd
+if socket.gethostname() == 'berttrainer-large':
+    from datasource import DataSource, cwd
+    from tools import aggreate
+    from create_raster import RasterCreater
+else:
+    from zur_sim.datasource import DataSource, cwd
+    from zur_sim.tools import aggreate
+    from zur_sim.create_raster import RasterCreater
+
 from scipy.spatial.distance import cdist
 import networkx as nx
-from zur_sim.tools import aggreate
-from zur_sim.create_raster import RasterCreater
 import matplotlib.pyplot as plt
 import seaborn as sns
 import contextily as cx
@@ -40,6 +46,12 @@ class TransitionMatrix:
         self.knn = 8
         self.target_ids = target_ids
         self.targets = tuple(np.where((self.df.ZSID.values == self.target_ids[0]) | (self.df.ZSID.values == self.target_ids[1]))[0])
+        mask = [zsid in significant_hubs for zsid in self.df.ZSID.values]
+        self.significant_targets = (
+            tuple(
+                np.where(
+                    mask
+                )[0]))
 
         # print('using: {} and {} as Target hubs'.format( target_ids[0], target_ids[1]))
         # print('using: {} and {} as Target hubs'.format( self.df.ZSID.iloc[self.targets[0]], self.df.ZSID.iloc[self.targets[1]]))
@@ -164,7 +176,7 @@ class TransitionMatrix:
 
         return path0
 
-    def plot(self, paths):
+    def plot(self, paths = None):
 
         fig, ax = plt.subplots(figsize=(8, 8))
         # X,Y,Z = self.raster['x'].values, self.raster['y'].values, self.raster['weight'].values
@@ -209,27 +221,29 @@ class TransitionMatrix:
             # title = df.MessungDatZeit.iloc[0].replace('T', ' '),
         )
         cx.add_basemap(ax)
+        if paths is not None:
+            for path in paths:
+                # plot the cheapest path
+                px_path, py_path = zip(*path)
+                # px_path = [x[i] for i in x_path]
+                # py_path = [y[i] for i in path]
+                # plot the line (semi-transparent)
+                ax.plot(px_path, py_path, color="black", lw=2, alpha=0.4)
 
-        for path in paths:
-            # plot the cheapest path
-            px_path, py_path = zip(*path)
-            # px_path = [x[i] for i in x_path]
-            # py_path = [y[i] for i in path]
-            # plot the line (semi-transparent)
-            ax.plot(px_path, py_path, color="black", lw=2, alpha=0.4)
-
-            # plot the nodes of the path (transparent fill, visible border)
-            ax.scatter(
-                px_path,
-                py_path,
-                facecolors="none",  # transparent center
-                edgecolors="none",
-                s=80,
-                linewidth=0.5,
-                zorder=5
-            )
+                # plot the nodes of the path (transparent fill, visible border)
+                ax.scatter(
+                    px_path,
+                    py_path,
+                    facecolors="none",  # transparent center
+                    edgecolors="none",
+                    s=80,
+                    linewidth=0.5,
+                    zorder=5
+                )
+        # print(x)
         for i, txt in enumerate(range(len(x))):
-            if i in self.target_ids:
+            # if i in self.targets:
+            if i in self.significant_targets:
             # if True:
                 plt.text(x[i] + 0.3, y[i] + 0.3, str(self.nodes.index[i]))
         plt.title(self.timestamp)
@@ -238,8 +252,8 @@ class TransitionMatrix:
         # plt.savefig(f'{cwd}/plots/{self.timestamp.split(" ")[0]}/sim_map_{self.timestamp}.png')
         if not os.path.exists(f'{cwd}/zur_sim/plots/{self.timestamp.split(" ")[0]}/'):
             os.makedirs(f'{cwd}/zur_sim/plots/{self.timestamp.split(" ")[0]}/')
-        fig.savefig(f'{cwd}/zur_sim/plots/{self.timestamp.split(" ")[0]}/sim_map_{self.timestamp.replace(" ", "_")}.png', dpi=300, bbox_inches="tight")
-        # plt.show()
+        # fig.savefig(f'{cwd}/zur_sim/plots/{self.timestamp.split(" ")[0]}/sim_map_{self.timestamp.replace(" ", "_")}.png', dpi=300, bbox_inches="tight")
+        plt.show()
 
     def sample_multiple(self, nr_samples=100, targets=None, plot=False):
         if targets is None:
@@ -264,11 +278,12 @@ class TransitionMatrix:
 
 
 
-
+significant_hubs = ['Z027', 'Z034', 'Z051', 'Z058', 'Z059', 'Z081', 'Z086', 'Z092', 'Z095', 'Z097', 'Z103', 'Z104', 'Z114']
+zsids = 'Z034', 'Z059'
 if __name__ == '__main__':
     # pass
     hub_distributions = []
-    date = '2026-01-08'
+    date = '2026-02-01T10:00:00'
     ds = DataSource()
     df = ds.df
     datetimes = df.loc[df.MessungDatZeit.str.startswith(date)].MessungDatZeit.unique()
@@ -278,6 +293,7 @@ if __name__ == '__main__':
     tmp_df = tmp_df.loc[tmp_df.MessungDatZeit == datetime]
     # tm = TransitionMatrix(df, kind='nodecount')
 
-    tm = TransitionMatrix(tmp_df, kind='density')
+    tm = TransitionMatrix(tmp_df, kind='density', target_ids=zsids)
     tm.main()
     res = tm.sample_multiple()
+    tm.plot()

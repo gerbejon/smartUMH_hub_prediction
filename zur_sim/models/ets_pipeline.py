@@ -328,7 +328,7 @@ def ets_pipeline(
     forecast_df = forecast_ets(fit, series_test)
 
     # ── Step 5 — plot: train | true test | forecast ─────
-    plot_results(series_train, series_test, forecast_df, postfix=postfix)
+    # plot_results(series_train, series_test, forecast_df, postfix=postfix)
 
     # ── Step 6 — metrics ────────────────────────────────
     metrics = evaluate(series_test, forecast_df)
@@ -357,6 +357,15 @@ def get_example_ts() -> pd.Series:
     )
     index = pd.date_range("2020-01-01", periods=n, freq="MS")
     return pd.Series(signal, index=index, name="value")
+
+def main_ets(ts):
+    forecast_df, best_params, metrics = ets_pipeline(
+        ts,
+        max_period=50,
+        train_ratio=0.8,
+        postfix="hub1",
+    )
+    return forecast_df, best_params, metrics
 
 
 if __name__ == "__main__":
