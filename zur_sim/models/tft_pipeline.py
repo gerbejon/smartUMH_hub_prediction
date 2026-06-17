@@ -102,7 +102,7 @@ def plot_results(
     ax.grid(True, alpha=0.3)
     plt.tight_layout()
     fname = f"tft_forecast_{postfix}.png" if postfix else "tft_forecast.png"
-    plt.savefig(fname, dpi=150)
+    # plt.savefig(fname, dpi=150)
     plt.show()
     print(f"[Plot] Saved as {fname}")
 
@@ -458,6 +458,19 @@ def get_example_ts() -> pd.Series:
     index = pd.date_range("2020-01-01", periods=n, freq="MS")
     return pd.Series(signal, index=index, name="value")
 
+
+def main_tft(ts, postfix):
+    forecast_df, best_params, metrics = tft_pipeline(
+        ts,
+        max_period=50,
+        hidden_size_options=[64, 128],
+        attention_head_size_options=[1, 2],
+        dropout_options=[0.1, 0.3],
+        max_steps_options=[100, 300],
+        train_ratio=0.8,
+        postfix=postfix,
+    )
+    return forecast_df, best_params, metrics
 
 if __name__ == "__main__":
 

@@ -278,7 +278,7 @@ class TransitionMatrix:
 
 
 
-significant_hubs = ['Z027', 'Z034', 'Z051', 'Z058', 'Z059', 'Z081', 'Z086', 'Z092', 'Z095', 'Z097', 'Z103', 'Z104', 'Z114']
+significant_hubs = ['Z027', 'Z034', 'Z051', 'Z058', 'Z081', 'Z086', 'Z092', 'Z093', 'Z095', 'Z097', 'Z103', 'Z104', 'Z112', 'Z113', 'Z114']
 zsids = 'Z034', 'Z059'
 if __name__ == '__main__':
     # pass

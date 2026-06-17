@@ -4,6 +4,7 @@ import os
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
+from progressbar import progressbar
 from scipy import stats
 import numpy as np
 from statsmodels.stats.multitest import multipletests
@@ -11,32 +12,57 @@ from statsmodels.stats.multitest import multipletests
 
 def get_significant_hubs(df):
     results = []
+    print('calculating hub significance')
 
-    for t in df.index:
+    all_scores_flat = df.values.flatten()
+    all_scores_flat = all_scores_flat[~np.isnan(all_scores_flat)]  # precompute once
+
+    for t in progressbar(df.index):
         scores_at_t = df.loc[t].dropna().values
-        all_other_scores = df.drop(t).values.flatten()
-        all_other_scores = all_other_scores[~np.isnan(all_other_scores)]
 
-        if len(scores_at_t) == 0:  # skip if no valid values
+        if len(scores_at_t) == 0:
             results.append({'timestep': t, 'p_value': np.nan})
             continue
+
+        # Remove scores_at_t from all_scores to get "all others"
+        all_other_scores = all_scores_flat[~np.isin(all_scores_flat, scores_at_t)]
 
         stat, p = stats.mannwhitneyu(scores_at_t, all_other_scores, alternative='less')
         results.append({'timestep': t, 'p_value': p})
 
     results_df = pd.DataFrame(results)
-
-
     rejected, corrected_pvals, _, _ = multipletests(results_df['p_value'], method='fdr_bh')
-
     results_df['corrected_pval'] = corrected_pvals
     results_df['significant'] = rejected
 
     return results_df['timestep'].loc[results_df.significant].values
+# def get_significant_hubs(df):
+#     results = []
+#     print('calculating hub significance')
+#     for t in progressbar(df.index):
+#         scores_at_t = df.loc[t].dropna().values
+#         all_other_scores = df.drop(t).values.flatten()
+#         all_other_scores = all_other_scores[~np.isnan(all_other_scores)]
+#
+#         if len(scores_at_t) == 0:  # skip if no valid values
+#             results.append({'timestep': t, 'p_value': np.nan})
+#             continue
+#
+#         stat, p = stats.mannwhitneyu(scores_at_t, all_other_scores, alternative='less')
+#         results.append({'timestep': t, 'p_value': p})
+#
+#     results_df = pd.DataFrame(results)
+#
+#
+#     rejected, corrected_pvals, _, _ = multipletests(results_df['p_value'], method='fdr_bh')
+#
+#     results_df['corrected_pval'] = corrected_pvals
+#     results_df['significant'] = rejected
+#
+#     return results_df['timestep'].loc[results_df.significant].values
 
 
-def plot_performance(df, score_name: str):
-    significant_hubs = get_significant_hubs(df)
+def plot_performance(df, score_name: str, significant_hubs: list = None):
 
     palette = sns.color_palette(n_colors=df.shape[1])
 
@@ -57,10 +83,11 @@ def plot_performance(df, score_name: str):
     ax.grid()
     plt.xticks(rotation=90, ha='right')
 
-    if len(significant_hubs) > 0:
-        for label in ax.get_xticklabels():
-            if label.get_text() in significant_hubs:
-                label.set_color('red')
+    if significant_hubs is not None:
+        if len(significant_hubs) > 0:
+            for label in ax.get_xticklabels():
+                if label.get_text() in significant_hubs:
+                    label.set_color('red')
 
 
     for i, model in enumerate(df.columns):
@@ -101,15 +128,18 @@ def main_performance_significance():
     df_mae = df[[col for col in df.columns if 'mae' in col]]
     df_mae.columns = df_mae.columns.droplevel('metric')
 
-
-    plot_performance(df_mape, score_name='mape')
-    plot_performance(df_rmse, score_name='rmse')
-    plot_performance(df_mae, score_name='mae')
-
-
     res = get_significant_hubs(df_mape)
-    res = [item for item in get_significant_hubs(df_mae) if item in res]
-    res = [item for item in get_significant_hubs(df_rmse) if item in res]
+    plot_performance(df_mape, score_name='mape', significant_hubs=list(res))
+    sign_hubs_rmse = get_significant_hubs(df_rmse)
+    plot_performance(df_rmse, score_name='rmse', significant_hubs=list(sign_hubs_rmse))
+    res = [item for item in sign_hubs_rmse if item in res]
+    sign_hubs_mae = get_significant_hubs(df_mae)
+    plot_performance(df_mae, score_name='mae', significant_hubs=list(sign_hubs_mae))
+    res = [item for item in sign_hubs_mae if item in res]
+
+    # res = get_significant_hubs(df_mape)
+    # res = [item for item in get_significant_hubs(df_mae) if item in res]
+    # res = [item for item in get_significant_hubs(df_rmse) if item in res]
     print(f'Significant Hubs: {res}')
     #######################333333
     return res
@@ -146,6 +176,7 @@ if __name__ == '__main__':
     ax.set_ylabel('Value')
     ax.grid()
     plt.tight_layout()
+    plt.savefig('./models/performance/all_hub_ts.png')
     plt.show()
 
     #

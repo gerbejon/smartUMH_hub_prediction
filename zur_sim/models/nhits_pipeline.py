@@ -379,7 +379,7 @@ def nhits_pipeline(
     forecast_df = forecast_nhits(nf, series_train, series_test)
 
     # ── Step 5 — plot: train | true test | forecast ─────
-    # plot_results(series_train, series_test, forecast_df, postfix=postfix)
+    plot_results(series_train, series_test, forecast_df, postfix=postfix)
 
     # ── Step 6 — metrics ────────────────────────────────
     metrics = evaluate(series_test, forecast_df)
@@ -410,7 +410,7 @@ def get_example_ts() -> pd.Series:
     return pd.Series(signal, index=index, name="value")
 
 
-def main_nhits(ts):
+def main_nhits(ts, postfix):
     forecast_df, best_params, metrics = nhits_pipeline(
         ts,
         max_period=50,
@@ -418,7 +418,7 @@ def main_nhits(ts):
         mlp_units_options=[128, 256],
         max_steps_options=[100, 300],
         train_ratio=0.8,
-        postfix="hub1",
+        postfix=postfix,
     )
     return forecast_df, best_params, metrics
 

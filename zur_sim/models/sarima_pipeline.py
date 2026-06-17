@@ -183,7 +183,8 @@ def plot_results(
     series_test: pd.Series,
     forecast_df: pd.DataFrame,
     title: str = "SARIMA — Train / Test Forecast",
-    plot_short = False
+    plot_short = False,
+    postfix = ''
 ):
     fig, ax = plt.subplots(figsize=(14, 5))
     if plot_short:
@@ -255,6 +256,7 @@ def sarima_pipeline(
     P_range: range = range(0, 2),
     Q_range: range = range(0, 2),
     train_ratio: float = 0.8,
+    postfix: str = '',
 ) -> tuple[pd.DataFrame, dict, dict]:
     """
     End-to-end SARIMA pipeline with train/test split.
@@ -297,7 +299,8 @@ def sarima_pipeline(
     forecast_df = forecast_sarima(fit, series_test)
 
     # ── Step 6 — plot: train | true test | forecast ─────
-    # plot_results(series_train, series_test, forecast_df, plot_short=True)
+    plot_results(series_train, series_test, forecast_df, plot_short=True,
+                 postfix=postfix)
 
     # ── Step 7 — metrics ────────────────────────────────
     metrics = evaluate(series_test, forecast_df)
@@ -328,13 +331,16 @@ def get_example_ts() -> pd.Series:
     return pd.Series(signal, index=index, name="value")
 
 
-def get_data():
-    df = pd.read_csv("../data/hub_distribution.csv", index_col=0)
+def get_data(data_dir=None):
+    if data_dir is None:
+        df = pd.read_csv("../data/hub_distribution.csv", index_col=0)
+    else:
+        df = pd.read_csv(data_dir, index_col=0)
     df_hub1 = df.iloc[:, 0].fillna(0)
     df_hub2 = df.iloc[:, 1].fillna(0)
     return df_hub1, df_hub2
 
-def main_sarima(ts):
+def main_sarima(ts, postfix):
     forecast_df, best_params, metrics = sarima_pipeline(
         ts,
         max_period=50,
@@ -343,12 +349,13 @@ def main_sarima(ts):
         P_range=range(0, 2),
         Q_range=range(0, 2),
         train_ratio=0.8,
+        postfix=postfix
     )
     return forecast_df, best_params, metrics
 
 if __name__ == "__main__":
-
-    df_hub1, df_hub2 = get_data()
+    data_dir = '../data/Z034_Z059_2026-02/hub_distribution.csv'
+    df_hub1, df_hub2 = get_data(data_dir)
     # Hub 1
     postfix = "hub1"
     forecast_df_hub1, best_params_hub1, metrics_hub1 = sarima_pipeline(
