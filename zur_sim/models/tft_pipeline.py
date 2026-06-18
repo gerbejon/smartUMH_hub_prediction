@@ -19,6 +19,7 @@ Key TFT advantage over N-HiTS:
   - plot_attention() visualises these weights after forecasting
 """
 
+import os
 import warnings
 import numpy as np
 import pandas as pd
@@ -124,7 +125,8 @@ def evaluate(series_test: pd.Series, forecast_df: pd.DataFrame) -> dict:
 
 
 def get_data():
-    df = pd.read_csv("../data/hub_distribution.csv", index_col=0)
+    data_path = os.path.join(os.path.dirname(__file__), "..", "data", "hub_distribution.csv")
+    df = pd.read_csv(data_path, index_col=0)
     df_hub1 = df.iloc[:, 0].fillna(0)
     df_hub2 = df.iloc[:, 1].fillna(0)
     return df_hub1, df_hub2

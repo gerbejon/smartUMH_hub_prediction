@@ -8,3 +8,4 @@ zur_sim/data
 *.png
 lightning_logs
 .idea
+.venv/

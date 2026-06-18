@@ -14,6 +14,7 @@ Prophet-specific replacements (steps 3-5):
 """
 
 import warnings
+from pathlib import Path
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -114,7 +115,8 @@ def evaluate(series_test: pd.Series, forecast_df: pd.DataFrame) -> dict:
 
 
 def get_data():
-    df = pd.read_csv("../data/hub_distribution.csv", index_col=0)
+    data_path = Path(__file__).resolve().parent.parent / "data" / "hub_distribution.csv"
+    df = pd.read_csv(data_path, index_col=0)
     df_hub1 = df.iloc[:, 0].fillna(0)
     df_hub2 = df.iloc[:, 1].fillna(0)
     return df_hub1, df_hub2

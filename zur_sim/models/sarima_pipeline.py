@@ -10,6 +10,7 @@ Steps:
 
 import warnings
 import itertools
+from pathlib import Path
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -331,11 +332,13 @@ def get_example_ts() -> pd.Series:
     return pd.Series(signal, index=index, name="value")
 
 
+DATA_ROOT = Path(__file__).resolve().parent.parent / "data"
+
+
 def get_data(data_dir=None):
     if data_dir is None:
-        df = pd.read_csv("../data/hub_distribution.csv", index_col=0)
-    else:
-        df = pd.read_csv(data_dir, index_col=0)
+        data_dir = DATA_ROOT / "hub_distribution.csv"
+    df = pd.read_csv(data_dir, index_col=0)
     df_hub1 = df.iloc[:, 0].fillna(0)
     df_hub2 = df.iloc[:, 1].fillna(0)
     return df_hub1, df_hub2
@@ -354,7 +357,7 @@ def main_sarima(ts, postfix):
     return forecast_df, best_params, metrics
 
 if __name__ == "__main__":
-    data_dir = '../data/Z034_Z059_2026-02/hub_distribution.csv'
+    data_dir = DATA_ROOT / "Z034_Z059_2026-02" / "hub_distribution.csv"
     df_hub1, df_hub2 = get_data(data_dir)
     # Hub 1
     postfix = "hub1"
