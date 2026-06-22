@@ -190,16 +190,29 @@ def plot_forecasts_grid(test, predictions, metrics_df, out_path, target: str = "
 
 
 def plot_metrics_bar(metrics_df, out_path, target: str = ""):
-    """Horizontal bar chart comparing MAE / RMSE / sMAPE across models."""
-    metric_cols = ["MAE", "RMSE", "sMAPE_%"]
+    """Horizontal bar chart comparing MAE / RMSE / sMAPE (+ Skill_% if present)."""
+    # Skill_% (improvement over the flat-mean baseline) is shown when available;
+    # it can be negative, so it gets diverging colors and a symmetric-ish axis.
+    metric_cols = [c for c in ["MAE", "RMSE", "sMAPE_%", "Skill_%"] if c in metrics_df]
     df = metrics_df.set_index("model")[metric_cols].sort_values("RMSE")
-    fig, axes = plt.subplots(1, len(metric_cols), figsize=(14, 4))
+    fig, axes = plt.subplots(1, len(metric_cols), figsize=(4.7 * len(metric_cols), 4))
+    axes = np.atleast_1d(axes)
     for ax, col in zip(axes, metric_cols):
-        bars = ax.barh(df.index[::-1], df[col][::-1], color="#4c78a8")
-        ax.set_title(col)
+        vals = df[col][::-1]
+        if col == "Skill_%":
+            colors = ["#59a14f" if v > 0 else "#e15759" for v in vals]
+            bars = ax.barh(df.index[::-1], vals, color=colors)
+            ax.axvline(0, color="black", lw=0.8)
+            ax.set_title("Skill_% vs flat-mean  (>0 = real skill)")
+            lo, hi = min(vals.min(), 0), max(vals.max(), 0)
+            pad = (hi - lo) * 0.18 or 1.0
+            ax.set_xlim(lo - pad, hi + pad)
+        else:
+            bars = ax.barh(df.index[::-1], vals, color="#4c78a8")
+            ax.set_title(col)
+            ax.set_xlim(right=df[col].max() * 1.18)
         ax.bar_label(bars, fmt="%.2f", padding=3, fontsize=8)
         ax.grid(axis="x", alpha=0.25)
-        ax.set_xlim(right=df[col].max() * 1.18)
     fig.suptitle(f"Hub {target} share — model comparison")
     fig.tight_layout()
     fig.savefig(out_path, dpi=120)

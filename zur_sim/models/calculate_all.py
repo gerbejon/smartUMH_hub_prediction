@@ -41,6 +41,7 @@ def _load_model(module_name, fn_name):
 
 MODEL_ENTRYPOINTS = {
     # Baselines
+    "mean":           _load_model("mean_pipeline",            "main_mean"),
     "naive":          _load_model("naive_pipeline",           "main_naive"),
     "seasonal_naive": _load_model("seasonal_naive_pipeline",  "main_seasonal_naive"),
     "moving_average": _load_model("moving_average_pipeline",  "main_moving_average"),
@@ -50,6 +51,8 @@ MODEL_ENTRYPOINTS = {
     "prophet":        _load_model("prophet_pipeline",         "main_prophet"),
     # Machine / deep learning
     "xgboost":        _load_model("xgboost_pipeline",         "main_xgboost"),
+    "lightgbm":       _load_model("lightgbm_pipeline",        "main_lightgbm"),
+    "dlinear":        _load_model("dlinear_pipeline",         "main_dlinear"),
     "nhits":          _load_model("nhits_pipeline",           "main_nhits"),
     "tft":            _load_model("tft_pipeline",             "main_tft"),
 }
@@ -102,6 +105,23 @@ def plot_model_comparison(ts, forecasts, label, out_dir=PLOTS_DIR):
         .sort_values("RMSE")
         .reset_index(drop=True)
     )
+
+    # ── Skill vs the flat-mean baseline ─────────────────────────────────────
+    # Skill_% = 100 * (1 - model_RMSE / baseline_RMSE).  > 0 means the model
+    # genuinely beats "predict the constant mean"; <= 0 means no real skill.
+    # Falls back to the actual flat-mean RMSE if the 'mean' model wasn't run.
+    if "mean" in metrics_df["model"].values:
+        baseline_rmse = float(metrics_df.loc[metrics_df["model"] == "mean", "RMSE"].iloc[0])
+    else:
+        flat = np.full(len(test), float(train["y"].mean()))
+        baseline_rmse = float(np.sqrt(np.mean((test["y"].to_numpy() - flat) ** 2)))
+    metrics_df["Skill_%"] = 100.0 * (1.0 - metrics_df["RMSE"] / baseline_rmse)
+
+    print(f"\n[Skill vs flat-mean baseline (RMSE={baseline_rmse:.3f})] for {label}")
+    print(metrics_df.to_string(index=False))
+    if (metrics_df["Skill_%"] <= 0.5).all():
+        print("[calculate_all] WARNING: no model beats the flat mean by >0.5% — "
+              "this series has little exploitable signal at this horizon.")
 
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
