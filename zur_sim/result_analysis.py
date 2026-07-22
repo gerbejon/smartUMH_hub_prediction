@@ -1,3 +1,19 @@
+"""
+Hub Significance & Performance Visualization
+============================================
+Post-processing utilities for the per-series model scores produced by the
+forecasting pipelines (see models/calculate_all.py, which writes
+models/performance/result_dict.json).
+
+The core question here is: for a given error metric, which hubs (time series)
+are *significantly easier* to forecast than the rest? A hub whose scores are
+consistently lower than the pooled scores of all other hubs is flagged as
+"significant" via a per-timestep Mann-Whitney U test with Benjamini-Hochberg
+FDR correction. The module also renders line plots of every model's score
+across observations and, when run as a script, overlays the raw hub time
+series with the significant ones highlighted.
+"""
+
 import json
 import os
 
@@ -11,6 +27,25 @@ from statsmodels.stats.multitest import multipletests
 
 
 def get_significant_hubs(df):
+    """Flag rows (hubs/observations) that score significantly below the rest.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Score matrix indexed by series/hub id, one column per model, holding a
+        single error metric (e.g. MAE). NaNs are ignored.
+
+    For each index value ``t`` the model scores at ``t`` are compared against
+    the pooled scores of every other cell via a one-sided Mann-Whitney U test
+    (alternative='less', i.e. testing whether ``t`` tends to be *lower* =
+    easier to forecast). The resulting p-values are corrected across all rows
+    with the Benjamini-Hochberg FDR procedure.
+
+    Returns
+    -------
+    np.ndarray
+        The index labels (hub ids) whose corrected p-value is significant.
+    """
     results = []
     print('calculating hub significance')
 
@@ -63,6 +98,23 @@ def get_significant_hubs(df):
 
 
 def plot_performance(df, score_name: str, significant_hubs: list = None):
+    """Line-plot each model's error metric across all observations and save it.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Score matrix indexed by observation/series, one column per model.
+    score_name : str
+        Name of the metric held in ``df`` (e.g. "mae"); used for the y-axis
+        value, plot title, and the output filename
+        ``models/performance/<SCORE_NAME>_performance.png``.
+    significant_hubs : list, optional
+        Hub ids to emphasise: their x-axis tick labels are coloured red.
+
+    Per model, a short horizontal marker for the mean is drawn at the left edge
+    and a dashed marker for the median at the right edge. The y-axis is capped
+    at the 99.5th percentile to keep outliers from flattening the plot.
+    """
 
     palette = sns.color_palette(n_colors=df.shape[1])
 
@@ -99,6 +151,20 @@ def plot_performance(df, score_name: str, significant_hubs: list = None):
     plt.show()
 
 def main_performance_significance():
+    """Load stored scores, find significant hubs per metric, and plot them.
+
+    Reads ``models/performance/result_dict.json`` (nested
+    series -> model -> metric -> value), pivots it into one score matrix per
+    metric (MAPE, RMSE, MAE), and for each matrix runs :func:`get_significant_hubs`
+    and :func:`plot_performance`. The returned list is the *intersection* of the
+    hubs flagged significant across all three metrics, so only hubs that are
+    consistently easy to forecast survive.
+
+    Returns
+    -------
+    list
+        Hub ids flagged significant under MAPE, RMSE and MAE simultaneously.
+    """
     with open('./models/performance/result_dict.json', 'r') as f:
         data = json.load(f)
 

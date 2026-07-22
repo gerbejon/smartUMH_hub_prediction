@@ -1,3 +1,29 @@
+"""
+Multi-Model Forecast Comparison Driver
+======================================
+The single entrypoint that runs every forecasting pipeline over the hub time
+series and compares them. For each hub column in a ``hub_distribution.csv``
+dataset it calls each model's ``main_*`` entrypoint (mean, naive,
+seasonal_naive, moving_average, sarima, ets, prophet, xgboost, lightgbm, and
+the optional neural models dlinear/nhits/tft), each of which trains on the
+first 80% of the series and forecasts the held-out last 20%.
+
+Every pipeline returns the same ``(forecast_df, best_params, metrics)`` triple,
+so their forecasts on the shared test window can be scored side by side. The
+comparison reports MAE/RMSE/sMAPE plus a Skill_% score against the flat-mean
+baseline (>0 = the model genuinely beats "predict the constant mean") and
+emits a set of comparison plots per series. Accumulated metrics are persisted
+to ``result_dict.json`` for downstream analysis (see ../result_analysis.py).
+
+Heavy models with optional dependencies (prophet, neuralforecast, torch) are
+imported defensively: a missing package skips that model rather than aborting
+the whole run.
+
+Note: the walk-forward harness in walk_forward.py evaluates these same
+pipelines the *fairer* short-horizon way; this driver does the single-shot,
+whole-window comparison.
+"""
+
 import json
 import os
 import sys
@@ -30,6 +56,12 @@ from plot_utils import (
 # optional packages (prophet, neuralforecast, torch) that may not be installed
 # in every environment. Missing models are skipped instead of aborting the run.
 def _load_model(module_name, fn_name):
+    """Import ``fn_name`` from ``module_name``, or return None if unavailable.
+
+    Used to wire up MODEL_ENTRYPOINTS defensively: if the pipeline module or one
+    of its optional heavy dependencies fails to import, the error is reported
+    and None is returned so that model is simply skipped during the run.
+    """
     try:
         module = __import__(module_name, fromlist=[fn_name])
         return getattr(module, fn_name)

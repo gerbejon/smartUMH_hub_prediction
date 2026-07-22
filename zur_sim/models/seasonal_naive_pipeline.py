@@ -40,6 +40,10 @@ warnings.filterwarnings("ignore")
 # ─────────────────────────────────────────────
 
 def detect_periodicity(series: pd.Series, top_n: int = 3, max_period: int = 365) -> list[int]:
+    """Detect dominant seasonal periods. Candidate periods come from the peaks
+    of the FFT power spectrum (restricted to 2..max_period), then confirmed by
+    requiring ACF > 0.1 at that lag. Returns up to `top_n` periods, strongest
+    first (falls back to the raw FFT candidates if none are ACF-confirmed)."""
     values = series.dropna().values
     n = len(values)
 
@@ -72,6 +76,8 @@ def detect_periodicity(series: pd.Series, top_n: int = 3, max_period: int = 365)
 
 
 def evaluate(series_test: pd.Series, forecast_df: pd.DataFrame) -> dict:
+    """Compute and print test-set MAE, RMSE and MAPE (zero true values excluded
+    from MAPE); return them as a dict."""
     true = series_test.values
     pred = forecast_df["forecast"].values
 
@@ -88,6 +94,8 @@ def evaluate(series_test: pd.Series, forecast_df: pd.DataFrame) -> dict:
 
 
 def get_data():
+    """Load ../data/hub_distribution.csv (path resolved relative to this file)
+    and return the two hub share columns as NaN-filled (0) Series."""
     # Resolve ../data relative to this file so it works from any working dir.
     data_path = Path(__file__).resolve().parent.parent / "data" / "hub_distribution.csv"
     df = pd.read_csv(data_path, index_col=0)
@@ -221,6 +229,8 @@ def seasonal_naive_pipeline(
 # ─────────────────────────────────────────────
 
 def get_example_ts() -> pd.Series:
+    """Return a synthetic monthly demo series (300 points, period 12) with a
+    sine cycle, mild linear trend and noise, for standalone testing."""
     np.random.seed(42)
     n, period = 300, 12
     t = np.arange(n)
@@ -234,6 +244,8 @@ def get_example_ts() -> pd.Series:
 
 
 def main_seasonal_naive(ts, postfix):
+    """calculate_all.py entry point: run seasonal_naive_pipeline on `ts` and
+    return (forecast_df, best_params, metrics)."""
     forecast_df, best_params, metrics = seasonal_naive_pipeline(
         ts,
         max_period=50,

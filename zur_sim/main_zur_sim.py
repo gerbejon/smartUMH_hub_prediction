@@ -1,3 +1,13 @@
+"""
+Hub-distribution simulation driver
+==================================
+For a chosen pair of target hubs, walks every measurement timestamp of a day,
+builds a node-count TransitionMatrix from that snapshot, and samples where
+requests would be routed. Aggregating the samples per timestamp yields a time
+series of how demand is distributed across hubs, which is plotted and optionally
+written to `data/<hubA>_<hubB>_<date>/hub_distribution.csv`.
+"""
+
 import os
 
 import numpy as np
@@ -16,6 +26,16 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 
 def main(hub_inds: tuple[str, str]):
+    """Simulate and plot the per-hub request distribution for one hub pair.
+
+    `hub_inds` is a `(hub_a, hub_b)` pair of ZSID station ids used as the target
+    hubs. For each measurement timestamp of the module-level `date` (drawn from
+    the global `df`), a `nodecount` TransitionMatrix is built and sampled; the
+    sampled hub counts are collected into a per-timestamp DataFrame that is drawn
+    as a line plot and returned. If the output CSV for this pair already exists
+    the function returns early without recomputing (the CSV write itself is
+    currently commented out). Relies on the module globals `df` and `date`.
+    """
     folder_dir = os.path.join('data', '_'.join([str(hub_inds[0]), str(hub_inds[1]), date]))
     print(folder_dir)
     # print(os.path.abspath(os.path.join(folder_dir, 'hub_distribution.csv')))

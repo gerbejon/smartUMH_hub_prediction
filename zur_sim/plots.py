@@ -1,3 +1,14 @@
+"""
+Traffic map plotting and animation
+==================================
+Renders the Zurich counting-station data on a geographic map, colouring and
+sizing stations by vehicle count (`AnzFahrzeuge`). Provides an interactive
+Plotly map, static Matplotlib scatter/heatmap snapshots saved to disk, and
+helpers that batch-render one frame per timestamp for a day and stitch them into
+an MP4. Coordinates arrive in Swiss LV95 (EPSG:2056) and are reprojected to
+WGS84 (Plotly) or Web Mercator (map tiles) as needed.
+"""
+
 import socket
 if socket.gethostname() == 'berttrainer-large':
     from datasource import DataSource, datadir
@@ -17,6 +28,14 @@ import matplotlib.colors as mcolors
 import numpy as np
 
 def interactive_plot(df, vmin=None, vmax=None, kind=None):
+    """Open an interactive Plotly map of the stations in `df` in the browser.
+
+    Builds a GeoDataFrame from the LV95 E/N coordinates, reprojects to WGS84
+    lat/lon (required by Plotly), and draws a Mapbox scatter map where colour and
+    marker size both encode `AnzFahrzeuge`. All DataFrame columns are shown on
+    hover and the title is the first row's timestamp. `vmin`, `vmax` and `kind`
+    are accepted for signature parity but not used here.
+    """
 
     # create GeoDataFrame
     gdf = gpd.GeoDataFrame(
@@ -56,6 +75,16 @@ def interactive_plot(df, vmin=None, vmax=None, kind=None):
 
 
 def plot(df, vmin=None, vmax=None, kind=None, node_labels=None):
+    """Render a static Matplotlib map of the stations and save it as a PNG.
+
+    Reprojects the LV95 coordinates to Web Mercator so a basemap can be added.
+    `kind='scatter'` draws points coloured by `AnzFahrzeuge`; `kind='heatmap'`
+    draws a count-weighted KDE density surface. `vmin`/`vmax` fix the colour
+    scale (defaulting to the data's min/max) so frames across a day stay
+    comparable. The figure is always written to
+    `<datadir>/plots/map_plot_<timestamp>.png` and then closed. `node_labels` is
+    accepted but unused.
+    """
     if vmax is None:
         vmax=df.AnzFahrzeuge.max()
     if vmin is None:
@@ -118,6 +147,13 @@ def plot(df, vmin=None, vmax=None, kind=None, node_labels=None):
 
 
 def create_frames_per_day(day='2026-01-01', kind=None):
+    """Render one static map PNG per timestamp for the given `day`.
+
+    Loads the full dataset, keeps rows whose timestamp starts with `day`, and
+    calls `plot` for each unique timestamp using a shared colour scale
+    (vmin=0, vmax = the day's maximum count) so the frames are comparable.
+    `kind` selects the plot style ('scatter' or 'heatmap').
+    """
     ds = DataSource()
     df = ds.df.loc[ds.df.MessungDatZeit.str.startswith(day)]
     timestamps = df.MessungDatZeit.unique()
@@ -126,6 +162,12 @@ def create_frames_per_day(day='2026-01-01', kind=None):
         plot(df_sub, vmin=0, vmax=df.AnzFahrzeuge.max(), kind=kind)
 
 def create_video_frames_per_day(day='2026-01-01', kind=None):
+    """Stitch a day's saved `map_plot_<day>*.png` frames into an MP4.
+
+    Reads the matching PNGs in sorted (chronological) order and writes
+    `zurich_traffic_<kind>_<day>.mp4` into `<datadir>/plots/` at 6 fps. Assumes
+    `create_frames_per_day` has already produced the frames.
+    """
     frames = sorted(glob.glob(f"{datadir}/plots/map_plot_{day}*.png"))
     with imageio.get_writer(os.path.join(datadir, 'plots', f"zurich_traffic_{kind}_{day}.mp4"),
                             fps=6) as writer:

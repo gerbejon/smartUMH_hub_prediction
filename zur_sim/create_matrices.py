@@ -1,3 +1,19 @@
+"""
+Cost-matrix routing prototype (single snapshot)
+===============================================
+Standalone exploratory script that prototypes the traffic-aware routing later
+generalised into the ``TransitionMatrix`` class (see transition_matrix.py). It
+loads one traffic snapshot (2026-01-08 12:00), aggregates detector counts per
+station, projects the coordinates to lat/lon, and builds a node-to-node cost
+matrix that blends squared distance and destination traffic (weights
+``alpha``/``beta``). The matrix is sparsified to each node's ``k`` nearest
+neighbours, then Dijkstra finds the cheapest path between two hard-coded nodes,
+which is finally plotted.
+
+This module runs its logic at import time (top-level statements, not functions)
+and is kept mainly as a reference/experiment; the reusable version lives in
+transition_matrix.py.
+"""
 
 import socket
 if socket.gethostname() == 'berttrainer-large':

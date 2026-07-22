@@ -74,6 +74,7 @@ PIPELINE_FNS = {
 
 
 def _noop(*args, **kwargs):
+    """Do-nothing stand-in used to disable per-origin plotting in pipelines."""
     return None
 
 
@@ -92,6 +93,7 @@ def _load_pipeline(module_name, fn_name):
 
 
 def _metrics(y_true, y_pred):
+    """Return MAE, RMSE and symmetric MAPE (%) between truth and forecast."""
     y_true = np.asarray(y_true, float)
     y_pred = np.asarray(y_pred, float)
     err = y_pred - y_true
@@ -105,6 +107,13 @@ def _metrics(y_true, y_pred):
 
 
 def _origins(n):
+    """Pick N_ORIGINS rolling cutoffs evenly spaced from EVAL_START*n to n-HORIZON.
+
+    Each returned index c is a train/forecast split point: the model trains on
+    series[:c] and forecasts series[c:c+HORIZON]. If the series is too short for
+    the window (last cutoff n-HORIZON is at or before the start), only that last
+    origin is returned.
+    """
     start = round(EVAL_START * n)
     last  = n - HORIZON
     if last <= start:
@@ -136,6 +145,13 @@ def evaluate_series(series: pd.Series, models: dict, label: str) -> pd.DataFrame
 
 
 def summarize(per_origin: pd.DataFrame) -> pd.DataFrame:
+    """Aggregate per-origin metrics to per-model mean/std and Skill_%.
+
+    Skill_% = 100 * (1 - model_RMSE_mean / base), where base is the flat 'mean'
+    predictor's mean RMSE (falling back to the worst model's RMSE if 'mean' was
+    not run). Positive Skill_% means the model beats the flat mean. Rows are
+    sorted best (lowest RMSE_mean) first.
+    """
     agg = (per_origin.groupby("model")
            .agg(MAE_mean=("MAE", "mean"),   MAE_std=("MAE", "std"),
                 RMSE_mean=("RMSE", "mean"),  RMSE_std=("RMSE", "std"),
@@ -148,6 +164,13 @@ def summarize(per_origin: pd.DataFrame) -> pd.DataFrame:
 
 
 def run(model_names, hubs):
+    """Walk-forward-evaluate the named models on each hub series and write outputs.
+
+    Loads each pipeline, then for every (folder, column) hub reads its
+    hub_distribution.csv, runs evaluate_series + summarize, prints the leaderboard
+    with a skill verdict, and saves per-origin/summary CSVs plus walk-forward plots
+    to PLOTS_DIR. Missing data files and empty result sets are skipped.
+    """
     models = {}
     for name in model_names:
         mod, fn = PIPELINE_FNS[name]

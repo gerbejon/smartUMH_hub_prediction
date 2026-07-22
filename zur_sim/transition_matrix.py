@@ -1,3 +1,24 @@
+"""
+Traffic-aware transition matrix and hub routing
+===============================================
+Builds a cost graph over the Zurich detector stations and routes simulated
+vehicles from random origins to the nearest "hub", so we can estimate how demand
+distributes across candidate hubs for a given traffic snapshot.
+
+The cost of moving between two stations combines squared Euclidean distance and
+the traffic (density) at the destination, each min-max normalised and blended by
+``weight_distance``/``weight_traffic``. The full cost matrix is then sparsified
+to each node's ``knn`` nearest neighbours so that shortest paths follow a local
+road-like graph rather than teleporting across the city. Shortest paths are found
+with Dijkstra on a directed graph (costs are asymmetric because the traffic term
+depends on the destination).
+
+Density is supplied by ``RasterCreater`` (see create_raster.py): raw counts are
+smoothed into a per-node density stored as ``AnzFahrzeugeSmooth``. The class can
+sample many random start points and report which hub each one is routed to,
+which is the basis for the hub-share statistics used elsewhere in the project.
+"""
+
 import os.path
 import sys
 import socket
@@ -22,7 +43,52 @@ import contextily as cx
 import random
 
 class TransitionMatrix:
+    """Cost graph over detector stations plus hub-routing helpers.
+
+    A single instance corresponds to one traffic snapshot (one timestamp). On
+    construction it cleans missing counts, aggregates per station, builds the
+    smoothed density raster, and records which node indices correspond to the
+    target/hub stations. Call ``main`` to build the sparsified transition (cost)
+    matrix, then ``sample_multiple`` to route random origins to their cheapest
+    reachable hub.
+
+    Key attributes
+    --------------
+    z_col : str
+        Column used as the traffic cost: ``AnzFahrzeuge`` (raw count, ``kind``
+        = 'nodecount') or ``AnzFahrzeugeSmooth`` (density, ``kind`` = 'density').
+    raster : pandas.DataFrame
+        The smoothed density grid from ``RasterCreater``.
+    weight_distance, weight_traffic : float
+        Blend weights (both 0.5) for the distance and traffic cost terms.
+    knn : int
+        Number of nearest neighbours each node may transition to (8).
+    targets : tuple[int, ...]
+        Node indices of the two ``target_ids`` hubs.
+    significant_targets : tuple[int, ...]
+        Node indices of all stations in the module-level ``significant_hubs``.
+    """
+
     def __init__(self, df, kind = None, target_ids: tuple[str, str] = None):
+        """Prepare a snapshot: clean, aggregate, rasterise and locate hubs.
+
+        Parameters
+        ----------
+        df : pandas.DataFrame
+            Detector measurements for a single timestamp (station rows with
+            ``EKoord``/``NKoord``, ``AnzFahrzeuge``, ``ZSID``,
+            ``MessungDatZeit``).
+        kind : {'nodecount', 'density'}
+            Selects the traffic-cost column. 'nodecount' uses the raw vehicle
+            count; 'density' uses the KDE-smoothed density. Any other value
+            exits the process; None only prints a usage hint.
+        target_ids : tuple[str, str]
+            The two hub station IDs (``ZSID``) that vehicles may be routed to.
+
+        Side effects: fills missing counts, aggregates per station, computes the
+        smoothed density (``AnzFahrzeugeSmooth``), and creates the per-day plots
+        output directory.
+        """
         if kind is None:
             print('please state underlying costcalculation: \n- vehicle count per node [nodecount]\n- density of vehicles [density]')
         elif kind == 'nodecount':
@@ -60,6 +126,25 @@ class TransitionMatrix:
             os.makedirs(f'{cwd}/plots/{self.timestamp.split(" ")[0]}')
 
     def handle_na_counts(self, df, nn=4, method='median'):
+        """Impute missing vehicle counts from nearby stations.
+
+        For every row with a NaN ``AnzFahrzeuge``, finds the ``nn`` closest
+        stations (by Euclidean distance on ``EKoord``/``NKoord``) that do have a
+        count and fills the gap using them.
+
+        Parameters
+        ----------
+        nn : int, default 4
+            Number of nearest valid neighbours to draw from.
+        method : {'median', 'mean', 'sample'}, default 'median'
+            How to combine the neighbours: their median, their mean, or a single
+            random sample from their values.
+
+        Returns
+        -------
+        pandas.DataFrame
+            The same DataFrame with missing counts filled in place.
+        """
         for i, row in df.loc[df.AnzFahrzeuge.isna()].iterrows():
             e0, n0 = row.EKoord, row.NKoord
             # compute distance
@@ -78,6 +163,13 @@ class TransitionMatrix:
         return df
 
     def main(self, df = None):
+        """Build the cost matrix and its knn-sparsified transition matrix.
+
+        Preprocesses the data into a projected GeoDataFrame, computes the blended
+        distance/traffic ``cost_matrix``, and derives ``transition_matrix`` by
+        keeping only each node's ``knn`` nearest neighbours. Defaults to
+        ``self.df`` when ``df`` is None.
+        """
         if df is None:
             df = self.df
         # df = self.aggregate(self.df)
@@ -87,10 +179,22 @@ class TransitionMatrix:
 
 
     def calc_shortest_path(self, source, target, plot=True):
+        """Thin wrapper that routes ``source`` to ``target`` on ``self.matrix``.
+
+        Delegates to ``get_shortest_path``. Note: it does not return the path and
+        relies on ``self.matrix`` being set.
+        """
         self.get_shortest_path(self.matrix, source, target, plot=plot)
 
 
     def preprocess(self, df):
+        """Project stations to Web Mercator and attach lon/lat columns.
+
+        Drops rows with a missing traffic value, builds a GeoDataFrame from the
+        Swiss LV95 (EPSG:2056) coordinates, reprojects to EPSG:3857, and adds
+        ``lat``/``lon`` columns. The result is cached on ``self.gdf`` and
+        returned.
+        """
         df = df.loc[df[self.z_col].notna()]
         # df =  self.aggregate(df)
 
@@ -108,6 +212,19 @@ class TransitionMatrix:
         return self.gdf
 
     def create_cost_trans_matrix(self, gdf=None):
+        """Build the dense node-to-node cost matrix.
+
+        Assembles ``self.nodes`` (indexed by ``ZSID`` with ``x``/``y`` and the
+        traffic column), then combines two normalised terms:
+
+        - distance: squared pairwise Euclidean distance, min-max normalised;
+        - traffic: destination traffic (``traffic_matrix[i, j]`` = traffic at
+          ``j``), min-max normalised.
+
+        The diagonals are zeroed (no self-transition). Stores the normalised
+        components on ``self.distance_norm``/``self.traffic_norm`` and returns
+        ``weight_distance * distance_norm + weight_traffic * traffic_norm``.
+        """
         if gdf is None:
             gdf = self.gdf
         self.nodes = gdf[['lon', 'lat', 'ZSID', self.z_col]].set_index('ZSID')
@@ -142,6 +259,18 @@ class TransitionMatrix:
         return self.weight_distance * self.distance_norm + self.weight_traffic * self.traffic_norm
 
     def define_transition_limits(self, matrix, knn:int=None):
+        """Sparsify the cost matrix to each node's ``knn`` nearest neighbours.
+
+        For every node, keeps the costs to its ``knn`` closest nodes (by
+        ``distance_norm``) and sets all other transitions to ``inf``, so
+        shortest paths hop between nearby stations instead of jumping directly
+        across the network. Returns ``matrix`` unchanged when ``knn`` is None.
+
+        Returns
+        -------
+        numpy.ndarray
+            The sparsified cost matrix (non-neighbour entries are ``inf``).
+        """
         if knn is None:
             return matrix
 
@@ -156,7 +285,29 @@ class TransitionMatrix:
             return sparse_cost_matrix
 
     def get_shortest_path(self, matrix, source, targets, plot=True):
+        """Return the cheapest Dijkstra path from ``source`` to any target.
 
+        Builds a directed graph from ``matrix`` and, over all candidate
+        ``targets``, keeps the path with the lowest total cost -- i.e. it routes
+        the vehicle to its cheapest-reachable hub.
+
+        Parameters
+        ----------
+        matrix : numpy.ndarray
+            Node-to-node cost matrix (edge weights); ``inf`` means no edge.
+        source : int
+            Origin node index.
+        targets : iterable of int
+            Candidate destination (hub) node indices.
+        plot : bool
+            Accepted for signature compatibility; not used here.
+
+        Returns
+        -------
+        list[int]
+            Node indices of the cheapest path (its last element is the chosen
+            hub).
+        """
         total_cost0 = np.inf
         path0 = []
         for target in targets:
@@ -177,7 +328,14 @@ class TransitionMatrix:
         return path0
 
     def plot(self, paths = None):
+        """Render the snapshot: density heatmap, stations and optional routes.
 
+        Draws the raster density as a background heatmap, overlays the stations
+        coloured by their traffic value on a basemap, labels the significant
+        hubs, and -- if ``paths`` is given -- draws each routed path (a list of
+        ``(lon, lat)`` tuples). Displays the figure (saving is currently
+        commented out).
+        """
         fig, ax = plt.subplots(figsize=(8, 8))
         # X,Y,Z = self.raster['x'].values, self.raster['y'].values, self.raster['weight'].values
 
@@ -256,6 +414,28 @@ class TransitionMatrix:
         plt.show()
 
     def sample_multiple(self, nr_samples=100, targets=None, plot=False):
+        """Route many random origins to their cheapest hub.
+
+        Draws ``nr_samples`` random cells from the raster as origins; for each,
+        snaps to the nearest station, finds the cheapest path to any target hub
+        on ``self.transition_matrix``, and records the hub reached. Optionally
+        plots all sampled routes.
+
+        Parameters
+        ----------
+        nr_samples : int, default 100
+            Number of random origin points to simulate.
+        targets : iterable of int, optional
+            Candidate hub node indices; defaults to ``self.targets``.
+        plot : bool, default False
+            If True, draw the sampled paths via ``self.plot``.
+
+        Returns
+        -------
+        list[int]
+            The chosen hub (final path node) for each sampled origin; the
+            distribution over these is the hub share for this snapshot.
+        """
         if targets is None:
             targets = self.targets
 

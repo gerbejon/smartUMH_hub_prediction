@@ -33,6 +33,14 @@ DATA_CSV = MODELS_DIR.parent / "data" / "bikeshare_DC_hourly" / "hub_distributio
 
 
 def main():
+    """Walk-forward-evaluate the models on a bike-share window from the CLI args.
+
+    Parses [col, start, hours] and --include-neural, slices that window from the
+    reshaped bike CSV (keeping the string timestamp index the pipelines expect),
+    runs walk_forward's evaluate_series/summarize (dropping any non-finite
+    results), prints the skill leaderboard, and writes the summary CSVs and
+    walk-forward plots to PLOTS_DIR.
+    """
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     flags = [a for a in sys.argv[1:] if a.startswith("--")]
 

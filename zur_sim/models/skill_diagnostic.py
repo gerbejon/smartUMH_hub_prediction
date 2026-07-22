@@ -78,6 +78,12 @@ def one_step_skill(series: np.ndarray) -> dict:
 
 
 def run() -> pd.DataFrame:
+    """Compute one-step-ahead skill for every column of every 2026-02 hub dataset.
+
+    Scans DATA_DIR for '*2026-02' folders, reads each hub_distribution.csv, and
+    runs one_step_skill on every column long enough to fit (>= 3*AR_LAGS points).
+    Returns one row per hub/column with the RMSE/MAE/skill fields.
+    """
     rows = []
     folders = sorted(f for f in DATA_DIR.iterdir()
                      if f.is_dir() and f.name.endswith("2026-02"))
@@ -96,6 +102,13 @@ def run() -> pd.DataFrame:
 
 
 def summarize(results: pd.DataFrame) -> None:
+    """Print the cross-series skill verdict and save the CSV + boxplot.
+
+    Reports the median skill and share of series beating the mean (>1%) per
+    predictor, plus the best-of-3 median/max, and declares whether any cheap
+    predictor beats the running mean. Writes skill_diagnostic_one_step.csv and a
+    boxplot of skill-vs-mean across all series to PLOTS_DIR.
+    """
     skill_cols = ["persistence_skill_%", "seasonal24_skill_%", "ar_skill_%"]
     print("\n" + "=" * 64)
     print(f"  ROLLING ONE-STEP-AHEAD SKILL  —  {len(results)} hub/column series")

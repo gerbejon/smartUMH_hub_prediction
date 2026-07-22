@@ -1,3 +1,19 @@
+"""
+Traffic density raster creation
+===============================
+Turns the point measurements of the Zurich detector network (vehicle counts at
+discrete stations) into a smooth, regular grid ("raster") of traffic density.
+Each station carries an ``AnzFahrzeuge`` (vehicle count) at fixed coordinates;
+this module spreads those counts across a 2-D grid so that the simulation has a
+continuous density surface to sample from and to paint as a heatmap.
+
+Two smoothing strategies are offered: a weighted Gaussian kernel-density
+estimate (KDE) that normalises traffic density by station density, and a simpler
+nearest-neighbour interpolation followed by a Gaussian filter. Coordinates are
+reprojected from Swiss LV95 (EPSG:2056) to Web Mercator (EPSG:3857) so the grid
+lines up with standard map tiles.
+"""
+
 import socket
 if socket.gethostname() == 'berttrainer-large':
     from datasource import DataSource
@@ -18,13 +34,39 @@ import matplotlib.pyplot as plt
 
 
 class RasterCreater:
+    """Build a smooth traffic-density grid from point measurements.
+
+    Given a DataFrame of detector stations (one row per station, with
+    ``EKoord``/``NKoord`` coordinates and an ``AnzFahrzeuge`` vehicle count),
+    this class produces ``grid_df`` -- a long-format DataFrame with columns
+    ``x``, ``y`` and ``weight`` holding the estimated density on a regular
+    ``grid_res`` x ``grid_res`` grid. It can also map that grid back onto each
+    station to obtain a smoothed per-node density (``get_density_per_node``).
+    """
+
     def __init__(self, df, kde_bw=0.3):
+        """Store inputs and grid parameters.
+
+        Parameters
+        ----------
+        df : pandas.DataFrame
+            Station measurements with ``EKoord``, ``NKoord`` and
+            ``AnzFahrzeuge`` columns.
+        kde_bw : float, default 0.3
+            Bandwidth passed to ``scipy.stats.gaussian_kde`` (``bw_method``);
+            smaller values give a tighter, more peaked density.
+        """
         self.KDE = False
         self.df = df
         self.grid_res = 200
         self.kde_bw = kde_bw
 
     def main_kde(self, df=None):
+        """Compute the density grid with the KDE strategy.
+
+        Runs ``gaussian_kde`` and stores the resulting long-format grid in
+        ``self.grid_df``. Falls back to ``self.df`` when ``df`` is None.
+        """
         if df is None:
             df = self.df
         X,Y,Z = self.gaussian_kde(df)
@@ -32,6 +74,12 @@ class RasterCreater:
         # self.plot(X, Y, Z)
 
     def main_gf(self, df=None):
+        """Compute the density grid with the Gaussian-filter strategy.
+
+        Runs nearest-neighbour interpolation plus a Gaussian filter and stores
+        the resulting long-format grid in ``self.grid_df``. Falls back to
+        ``self.df`` when ``df`` is None.
+        """
         if df is None:
             df = self.df
         X,Y,Z = self.gaussan_filter(df)
@@ -39,6 +87,23 @@ class RasterCreater:
         # self.plot(X, Y, Z)
 
     def preprocess(self, df, z_col='AnzFahrzeuge'):
+        """Reproject stations and build the empty target grid.
+
+        Converts the station points from Swiss LV95 (EPSG:2056) to Web Mercator
+        (EPSG:3857), caches the station coordinates and values in ``self.x``,
+        ``self.y`` and ``self.z``, and builds a ``grid_res`` x ``grid_res``
+        meshgrid spanning the station bounding box.
+
+        Parameters
+        ----------
+        z_col : str, default 'AnzFahrzeuge'
+            Column holding the value (traffic count) to be gridded.
+
+        Returns
+        -------
+        (X, Y) : tuple of numpy.ndarray
+            The meshgrid coordinate arrays of the target grid.
+        """
         gdf = gpd.GeoDataFrame(
             df,
             geometry=gpd.points_from_xy(df.EKoord, df.NKoord),
@@ -59,6 +124,17 @@ class RasterCreater:
         return X,Y
 
     def gaussan_filter(self, df):
+        """Grid traffic via nearest-neighbour interpolation + Gaussian blur.
+
+        Interpolates the station counts onto the grid using nearest-neighbour
+        (filling any gaps with 0), then smooths with a Gaussian filter
+        (``sigma=3``).
+
+        Returns
+        -------
+        (X, Y, Z) : tuple of numpy.ndarray
+            Grid coordinates and the smoothed density surface.
+        """
         X, Y = self.preprocess(df, z_col='AnzFahrzeuge')
         Z = griddata(
             (self.x, self.y),
@@ -72,6 +148,18 @@ class RasterCreater:
         return X,Y,gaussian_filter(Z, sigma=3)
 
     def gaussian_kde(self, df):
+        """Grid traffic via a station-normalised weighted KDE.
+
+        Fits two Gaussian KDEs over the station coordinates: one weighted by the
+        traffic counts and one unweighted (station density). The returned
+        surface is the ratio ``kde_traffic / kde_stations``, i.e. traffic per
+        station, so densely instrumented areas are not over-counted.
+
+        Returns
+        -------
+        (X, Y, Z) : tuple of numpy.ndarray
+            Grid coordinates and the density surface reshaped to the grid.
+        """
         X, Y = self.preprocess(df, z_col='AnzFahrzeuge')
         # Kernel density estimate KDE
         positions = np.vstack([X.ravel(), Y.ravel()])
@@ -85,6 +173,18 @@ class RasterCreater:
         return  X, Y, Z.reshape(X.shape)
 
     def postprocess(self, X,Y,Z):
+        """Flatten the grid to a DataFrame and rescale to total traffic.
+
+        Turns the 2-D grid arrays into a long-format DataFrame with columns
+        ``x``, ``y`` and ``weight``, then rescales ``weight`` by the total
+        vehicle count (``self.z.sum()``) so the surface carries absolute
+        traffic units rather than a normalised density.
+
+        Returns
+        -------
+        pandas.DataFrame
+            The grid in long (one-row-per-cell) form.
+        """
         grid_df = pd.DataFrame({
             "x": X.ravel(),
             "y": Y.ravel(),
@@ -94,6 +194,7 @@ class RasterCreater:
         return grid_df
 
     def plot(self, X,Y,Z):
+        """Show the density surface ``Z`` as a hot-colormap heatmap."""
         fig, ax = plt.subplots(figsize=(8, 8))
 
         # plot heatmap
@@ -107,6 +208,20 @@ class RasterCreater:
         plt.show()
 
     def get_density_per_node(self, df=None):
+        """Sample the smoothed grid back onto each station.
+
+        For every station, finds the nearest grid cell (in reprojected Web
+        Mercator coordinates) and takes its ``weight``. The per-station values
+        are then renormalised so they sum to the original total vehicle count
+        (``df.AnzFahrzeuge.sum()``), yielding a smoothed vehicle count per node.
+
+        Requires a grid to have been built first (``main_kde``/``main_gf``).
+
+        Returns
+        -------
+        numpy.ndarray
+            Smoothed vehicle count per station, aligned with ``df``'s rows.
+        """
         if df is None:
             df = self.df
 

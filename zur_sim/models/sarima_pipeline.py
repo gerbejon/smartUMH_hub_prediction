@@ -27,6 +27,13 @@ warnings.filterwarnings("ignore")
 # ─────────────────────────────────────────────
 
 def detect_periodicity(series: pd.Series, top_n: int = 3, max_period: int = 365) -> list[int]:
+    """
+    Detect the dominant seasonal period(s) of a series via FFT + ACF.
+
+    Peaks of the FFT power spectrum (restricted to periods in [2, max_period])
+    give candidate periods, which are then confirmed when their ACF value
+    exceeds 0.1. Returns up to top_n periods, strongest first.
+    """
     values = series.dropna().values
     n = len(values)
 
@@ -63,6 +70,13 @@ def detect_periodicity(series: pd.Series, top_n: int = 3, max_period: int = 365)
 # ─────────────────────────────────────────────
 
 def select_d(series: pd.Series, max_d: int = 2) -> int:
+    """
+    Choose the non-seasonal differencing order d for SARIMA.
+
+    Applies successive differences (0..max_d) and returns the smallest d
+    for which the ADF test rejects the unit-root null (p < 0.05), i.e. the
+    series becomes stationary. Falls back to max_d if none qualifies.
+    """
     for d in range(max_d + 1):
         s = series.diff(d).dropna() if d > 0 else series.dropna()
         p_value = adfuller(s)[1]
@@ -74,6 +88,13 @@ def select_d(series: pd.Series, max_d: int = 2) -> int:
 
 
 def select_D(series: pd.Series, s: int, max_D: int = 1) -> int:
+    """
+    Choose the seasonal differencing order D for SARIMA (period s).
+
+    Applies successive lag-s seasonal differences (0..max_D) and returns the
+    smallest D for which the ADF test rejects the unit-root null (p < 0.05).
+    Falls back to max_D if none qualifies.
+    """
     for D in range(max_D + 1):
         s_diff = series.diff(s * D).dropna() if D > 0 else series.dropna()
         p_value = adfuller(s_diff)[1]
@@ -98,6 +119,14 @@ def grid_search_sarima(
     Q_range: range = range(0, 2),
     verbose: bool = True,
 ) -> dict:
+    """
+    Grid-search SARIMA orders (p,q,P,Q) and pick the lowest-AIC model.
+
+    d, D and s are fixed inputs (from select_d / select_D / detect_periodicity);
+    only the AR/MA orders are searched over the given ranges. Fits that fail to
+    converge are skipped. Prints the top-5 models and returns the best_params
+    dict with keys p, d, q, P, D, Q, s, aic.
+    """
     best_aic    = np.inf
     best_params = None
     results     = []
@@ -142,6 +171,11 @@ def grid_search_sarima(
 # ─────────────────────────────────────────────
 
 def fit_sarima(series: pd.Series, params: dict):
+    """
+    Fit the final SARIMAX model on the given series using the chosen
+    (p,d,q)(P,D,Q,s) orders in params, print its summary, and return the
+    fitted results object.
+    """
     model = SARIMAX(
         series,
         order=(params["p"], params["d"], params["q"]),
@@ -187,6 +221,11 @@ def plot_results(
     plot_short = False,
     postfix = ''
 ):
+    """
+    Plot training history, true test values, and the forecast with its 95% CI,
+    marking the train/test split. If plot_short is True, only the last 20% of
+    the training history is drawn. Saves the figure to sarima_forecast_<postfix>.png.
+    """
     fig, ax = plt.subplots(figsize=(14, 5))
     if plot_short:
         series_train = series_train.iloc[round(len(series_train) * 0.8):]
@@ -230,6 +269,11 @@ def plot_results(
 # ─────────────────────────────────────────────
 
 def evaluate(series_test: pd.Series, forecast_df: pd.DataFrame) -> dict:
+    """
+    Compute and print forecast error metrics (MAE, RMSE, MAPE) comparing the
+    true test values against forecast_df['forecast']. Zero-valued truths are
+    excluded from MAPE. Returns a dict with keys mae, rmse, mape.
+    """
     true = series_test.values
     pred = forecast_df["forecast"].values
 
@@ -320,6 +364,11 @@ def sarima_pipeline(
 # ─────────────────────────────────────────────
 
 def get_example_ts() -> pd.Series:
+    """
+    Build a synthetic monthly demo series (seasonal sine + linear trend +
+    Gaussian noise) for quick pipeline testing. Returns a pandas Series with a
+    monthly DatetimeIndex.
+    """
     np.random.seed(42)
     n, period = 300, 12
     t = np.arange(n)
@@ -336,6 +385,10 @@ DATA_ROOT = Path(__file__).resolve().parent.parent / "data"
 
 
 def get_data(data_dir=None):
+    """
+    Load the hub-distribution CSV (defaulting to DATA_ROOT/hub_distribution.csv)
+    and return the two hub share columns as Series with NaNs filled to 0.
+    """
     if data_dir is None:
         data_dir = DATA_ROOT / "hub_distribution.csv"
     df = pd.read_csv(data_dir, index_col=0)
@@ -344,6 +397,11 @@ def get_data(data_dir=None):
     return df_hub1, df_hub2
 
 def main_sarima(ts, postfix):
+    """
+    Convenience entry point: run sarima_pipeline on series ts with the default
+    search ranges and an 80/20 split, tagging outputs with postfix. Returns
+    (forecast_df, best_params, metrics).
+    """
     forecast_df, best_params, metrics = sarima_pipeline(
         ts,
         max_period=50,

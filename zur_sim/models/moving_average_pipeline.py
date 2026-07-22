@@ -33,6 +33,8 @@ warnings.filterwarnings("ignore")
 # ─────────────────────────────────────────────
 
 def evaluate(series_test: pd.Series, forecast_df: pd.DataFrame) -> dict:
+    """Compute and print test-set MAE, RMSE and MAPE (zero true values excluded
+    from MAPE); return them as a dict."""
     true = series_test.values
     pred = forecast_df["forecast"].values
 
@@ -49,6 +51,8 @@ def evaluate(series_test: pd.Series, forecast_df: pd.DataFrame) -> dict:
 
 
 def get_data():
+    """Load ../data/hub_distribution.csv (path resolved relative to this file)
+    and return the two hub share columns as NaN-filled (0) Series."""
     # Resolve ../data relative to this file so it works from any working dir.
     data_path = Path(__file__).resolve().parent.parent / "data" / "hub_distribution.csv"
     df = pd.read_csv(data_path, index_col=0)
@@ -178,6 +182,8 @@ def moving_average_pipeline(
 # ─────────────────────────────────────────────
 
 def get_example_ts() -> pd.Series:
+    """Return a synthetic monthly demo series (300 points, period 12) with a
+    sine cycle, mild linear trend and noise, for standalone testing."""
     np.random.seed(42)
     n, period = 300, 12
     t = np.arange(n)
@@ -191,6 +197,8 @@ def get_example_ts() -> pd.Series:
 
 
 def main_moving_average(ts, postfix):
+    """calculate_all.py entry point: run moving_average_pipeline on `ts` and
+    return (forecast_df, best_params, metrics)."""
     forecast_df, best_params, metrics = moving_average_pipeline(
         ts,
         max_period=50,

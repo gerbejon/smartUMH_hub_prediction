@@ -32,6 +32,13 @@ warnings.filterwarnings("ignore")
 # ─────────────────────────────────────────────
 
 def detect_periodicity(series: pd.Series, top_n: int = 3, max_period: int = 365) -> list[int]:
+    """
+    Detect the dominant seasonal period(s) of a series via FFT + ACF.
+
+    Peaks of the FFT power spectrum (restricted to periods in [2, max_period])
+    give candidate periods, which are then confirmed when their ACF value
+    exceeds 0.1. Returns up to top_n periods, strongest first.
+    """
     values = series.dropna().values
     n = len(values)
 
@@ -70,6 +77,11 @@ def plot_results(
     title: str = "Prophet — Train / Test Forecast",
     postfix = ''
 ):
+    """
+    Plot training history, true test values, and the forecast with its 95% CI,
+    marking the train/test split. Saves the figure to
+    prophet_forecast_<postfix>.png.
+    """
     fig, ax = plt.subplots(figsize=(14, 5))
 
     ax.plot(series_train.index, series_train.values,
@@ -99,6 +111,11 @@ def plot_results(
 
 
 def evaluate(series_test: pd.Series, forecast_df: pd.DataFrame) -> dict:
+    """
+    Compute and print forecast error metrics (MAE, RMSE, MAPE) comparing the
+    true test values against forecast_df['forecast']. Zero-valued truths are
+    excluded from MAPE. Returns a dict with keys mae, rmse, mape.
+    """
     true = series_test.values
     pred = forecast_df["forecast"].values
 
@@ -115,6 +132,10 @@ def evaluate(series_test: pd.Series, forecast_df: pd.DataFrame) -> dict:
 
 
 def get_data():
+    """
+    Load data/hub_distribution.csv relative to this module and return the two
+    hub share columns as Series with NaNs filled to 0.
+    """
     data_path = Path(__file__).resolve().parent.parent / "data" / "hub_distribution.csv"
     df = pd.read_csv(data_path, index_col=0)
     df_hub1 = df.iloc[:, 0].fillna(0)
@@ -360,6 +381,11 @@ def prophet_pipeline(
 # ─────────────────────────────────────────────
 
 def get_example_ts() -> pd.Series:
+    """
+    Build a synthetic monthly demo series (seasonal sine + linear trend +
+    Gaussian noise) for quick pipeline testing. Returns a pandas Series with a
+    monthly DatetimeIndex.
+    """
     np.random.seed(42)
     n, period = 300, 12
     t = np.arange(n)
@@ -372,6 +398,11 @@ def get_example_ts() -> pd.Series:
     return pd.Series(signal, index=index, name="value")
 
 def main_prophet(ts, postfix):
+    """
+    Convenience entry point: run prophet_pipeline on series ts with the default
+    hyperparameter grids and an 80/20 split, tagging outputs with postfix.
+    Returns (forecast_df, best_params, metrics).
+    """
     forecast_df, best_params, metrics = prophet_pipeline(
         ts,
         max_period=50,

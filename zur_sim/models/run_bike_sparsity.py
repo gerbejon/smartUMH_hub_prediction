@@ -35,6 +35,14 @@ DATA_CSV = MODELS_DIR.parent / "data" / "bikeshare_DC_hourly" / "hub_distributio
 
 
 def main():
+    """Run the sparsity sweep on a bike-share window from the CLI args.
+
+    Parses [col, start, hours] plus --models/--drops/--origins/--tag overrides,
+    slices that window from the reshaped bike CSV, and reuses sparsity_experiment's
+    run_hub/summarize/plot machinery to print RMSE- and Skill_%-by-drop-rate
+    tables and write the per-origin/summary CSVs and skill-vs-drop plot to
+    PLOTS_DIR.
+    """
     args  = [a for a in sys.argv[1:] if not a.startswith("--")]
     flags = [a for a in sys.argv[1:] if a.startswith("--")]
 

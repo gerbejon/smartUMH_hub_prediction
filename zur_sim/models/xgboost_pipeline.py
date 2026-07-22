@@ -48,6 +48,8 @@ FEATURE_COLS = (
 
 
 def calendar_features(ts: pd.Timestamp) -> dict:
+    """Cyclical calendar encodings for one timestamp: hour, day-of-week,
+    weekend flag, plus sin/cos of hour (period 24) and day-of-week (period 7)."""
     return {
         "hour": ts.hour,
         "dow": ts.dayofweek,
@@ -60,6 +62,10 @@ def calendar_features(ts: pd.Timestamp) -> dict:
 
 
 def build_training_frame(series_train: pd.Series) -> pd.DataFrame:
+    """Turn the training series into a supervised (X, y) frame: autoregressive
+    lag columns, shifted rolling means (shift(1) so only past values feed each
+    row), and calendar features, with the target `y`. Rows with NaNs from the
+    lag/rolling warm-up are dropped."""
     s = series_train
     idx = series_train.index
     feats = {f"lag{l}": s.shift(l) for l in LAGS}
@@ -78,6 +84,10 @@ def build_training_frame(series_train: pd.Series) -> pd.DataFrame:
 
 
 def feature_row(history: pd.Series, ts: pd.Timestamp) -> np.ndarray:
+    """Build the single feature vector for timestamp `ts` from `history` (all
+    values strictly before `ts`): lags via negative indexing, rolling means over
+    the last window values, and `ts`'s calendar features, ordered by FEATURE_COLS.
+    Used to produce one recursive one-step forecast."""
     # history is indexed by hour and contains all values strictly before `ts`.
     vals = {f"lag{l}": history.iloc[-l] for l in LAGS}
     for w in ROLL_WINDOWS:
@@ -91,6 +101,8 @@ def feature_row(history: pd.Series, ts: pd.Timestamp) -> np.ndarray:
 # ─────────────────────────────────────────────
 
 def evaluate(series_test: pd.Series, forecast_df: pd.DataFrame) -> dict:
+    """Compute and print test-set MAE, RMSE and MAPE (zero true values excluded
+    from MAPE); return them as a dict."""
     true = series_test.values
     pred = forecast_df["forecast"].values
 
@@ -107,6 +119,8 @@ def evaluate(series_test: pd.Series, forecast_df: pd.DataFrame) -> dict:
 
 
 def get_data():
+    """Load ../data/hub_distribution.csv (path resolved relative to this file)
+    and return the two hub share columns as NaN-filled (0) Series."""
     # Resolve ../data relative to this file so it works from any working dir.
     data_path = Path(__file__).resolve().parent.parent / "data" / "hub_distribution.csv"
     df = pd.read_csv(data_path, index_col=0)
@@ -254,6 +268,8 @@ def xgboost_pipeline(
 # ─────────────────────────────────────────────
 
 def get_example_ts() -> pd.Series:
+    """Return a synthetic hourly demo series (30 days, daily period 24) with a
+    sine cycle, mild linear trend and noise, for standalone testing."""
     np.random.seed(42)
     n, period = 24 * 30, 24
     t = np.arange(n)
@@ -267,6 +283,8 @@ def get_example_ts() -> pd.Series:
 
 
 def main_xgboost(ts, postfix):
+    """calculate_all.py entry point: run xgboost_pipeline on `ts` and return
+    (forecast_df, best_params, metrics)."""
     forecast_df, best_params, metrics = xgboost_pipeline(
         ts,
         max_period=50,

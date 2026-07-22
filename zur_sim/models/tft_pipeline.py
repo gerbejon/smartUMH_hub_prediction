@@ -41,6 +41,14 @@ warnings.filterwarnings("ignore")
 # ─────────────────────────────────────────────
 
 def detect_periodicity(series: pd.Series, top_n: int = 3, max_period: int = 365) -> list[int]:
+    """
+    Detect the dominant seasonal periods of a series via FFT, confirmed by ACF.
+
+    Peaks in the FFT spectrum (restricted to periods in [2, max_period]) give
+    candidate periods; those with autocorrelation > 0.1 at their lag are kept.
+
+    Returns the top_n periods, strongest first (informational for TFT).
+    """
     values = series.dropna().values
     n = len(values)
 
@@ -79,6 +87,10 @@ def plot_results(
     postfix: str = "",
     title: str = "TFT — Train / Test Forecast",
 ):
+    """
+    Plot train (observed), test (true) and forecast with 95% CI on one axis,
+    marking the train/test split. Shows the figure (filename built from postfix).
+    """
     fig, ax = plt.subplots(figsize=(14, 5))
 
     ax.plot(series_train.index, series_train.values,
@@ -109,6 +121,10 @@ def plot_results(
 
 
 def evaluate(series_test: pd.Series, forecast_df: pd.DataFrame) -> dict:
+    """
+    Compute MAE, RMSE and MAPE between the true test values and the forecast,
+    print them, and return them as a dict {"mae", "rmse", "mape"}.
+    """
     true = series_test.values
     pred = forecast_df["forecast"].values
 
@@ -125,6 +141,10 @@ def evaluate(series_test: pd.Series, forecast_df: pd.DataFrame) -> dict:
 
 
 def get_data():
+    """
+    Load ../data/hub_distribution.csv and return the two hub share series
+    (df_hub1, df_hub2) as NaN-filled (0) pandas Series.
+    """
     data_path = os.path.join(os.path.dirname(__file__), "..", "data", "hub_distribution.csv")
     df = pd.read_csv(data_path, index_col=0)
     df_hub1 = df.iloc[:, 0].fillna(0)
@@ -449,6 +469,10 @@ def tft_pipeline(
 # ─────────────────────────────────────────────
 
 def get_example_ts() -> pd.Series:
+    """
+    Build a synthetic monthly series (sine seasonality + linear trend + noise)
+    for quick demos/testing of the pipeline. Returns a datetime-indexed Series.
+    """
     np.random.seed(42)
     n, period = 300, 12
     t = np.arange(n)
@@ -462,6 +486,10 @@ def get_example_ts() -> pd.Series:
 
 
 def main_tft(ts, postfix):
+    """
+    Convenience entry point: run tft_pipeline() on `ts` with default option
+    grids and `postfix` for output naming. Returns (forecast_df, best_params, metrics).
+    """
     forecast_df, best_params, metrics = tft_pipeline(
         ts,
         max_period=50,

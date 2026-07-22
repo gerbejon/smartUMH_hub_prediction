@@ -67,6 +67,12 @@ def sparsify(train: pd.Series, p: float, rng) -> pd.Series:
 
 
 def origins(n):
+    """Pick N_ORIGINS rolling cutoffs evenly spaced from EVAL_START*n to n-HORIZON.
+
+    Same scheme as walk_forward._origins but with this module's smaller N_ORIGINS
+    (fewer origins because each is multiplied across the drop-rate sweep). Falls
+    back to just [n-HORIZON] when the series is too short.
+    """
     start, last = round(wf.EVAL_START * n), n - wf.HORIZON
     if last <= start:
         return [last]
@@ -74,6 +80,14 @@ def origins(n):
 
 
 def run_hub(series: pd.Series, models: dict, label: str) -> pd.DataFrame:
+    """Score every model at each origin and drop-rate against the true window.
+
+    For each rolling origin c and each drop-rate p, sparsifies the true training
+    slice series[:c] (drop + interpolate), refits every model on that sparse
+    input, forecasts HORIZON steps, and scores the forecast against the untouched
+    held-out window series[c:c+HORIZON]. Returns one row per
+    (model, drop_rate, origin) with the metric columns.
+    """
     h, n = wf.HORIZON, len(series)
     rng = np.random.default_rng(SEED)
     rows = []
@@ -99,6 +113,12 @@ def run_hub(series: pd.Series, models: dict, label: str) -> pd.DataFrame:
 
 
 def summarize(per: pd.DataFrame) -> pd.DataFrame:
+    """Average metrics per (model, drop-rate) and add within-sparsity Skill_%.
+
+    Skill_% for each row is 100 * (1 - RMSE / base), where base is the flat
+    'mean' predictor's RMSE at the SAME drop-rate (fair within-sparsity
+    reference), falling back to the worst RMSE if 'mean' is absent.
+    """
     agg = (per.groupby(["model", "drop_rate"])
               .agg(RMSE=("RMSE", "mean"), MAE=("MAE", "mean"),
                    sMAPE=("sMAPE_%", "mean"))
@@ -107,6 +127,7 @@ def summarize(per: pd.DataFrame) -> pd.DataFrame:
     base = (agg[agg.model == "mean"].set_index("drop_rate")["RMSE"]
             if (agg.model == "mean").any() else None)
     def skill(r):
+        """Skill_% of one row vs the flat mean at the same drop-rate."""
         b = base[r["drop_rate"]] if base is not None else agg["RMSE"].max()
         return 100.0 * (1.0 - r["RMSE"] / b) if b > 0 else 0.0
     agg["Skill_%"] = agg.apply(skill, axis=1)
@@ -114,6 +135,12 @@ def summarize(per: pd.DataFrame) -> pd.DataFrame:
 
 
 def plot_skill_vs_drop(agg: pd.DataFrame, label: str, out_path: Path):
+    """Plot RMSE and Skill_% versus drop-rate (one line per model) to out_path.
+
+    Two side-by-side panels: absolute RMSE and Skill_% vs the flat mean, both
+    against the percentage of training observations dropped. A robust model reads
+    as a flat line; a fragile one collapses as sparsity rises.
+    """
     colors = _model_colors(sorted(agg.model.unique()))
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(13, 4.6))
     for name, sub in agg.groupby("model"):
@@ -140,6 +167,13 @@ def plot_skill_vs_drop(agg: pd.DataFrame, label: str, out_path: Path):
 
 
 def main(model_names, tag=""):
+    """Run the sparsity sweep for the named models over every hub in HUBS.
+
+    Loads each pipeline, then for each hub reads its series, runs run_hub +
+    summarize, prints the RMSE-by-drop-rate table, writes per-origin/summary CSVs
+    (optionally tagged), and saves the skill-vs-drop plot when a 'mean' baseline
+    is present.
+    """
     models = {}
     for name in model_names:
         mod, fn = wf.PIPELINE_FNS[name]

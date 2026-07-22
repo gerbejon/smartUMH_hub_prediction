@@ -22,6 +22,8 @@ warnings.filterwarnings("ignore")
 
 
 def evaluate(series_test: pd.Series, forecast_df: pd.DataFrame) -> dict:
+    """Compute and print test-set MAE, RMSE and MAPE (zero true values excluded
+    from MAPE); return them as a dict."""
     true = series_test.values
     pred = forecast_df["forecast"].values
 
@@ -94,4 +96,6 @@ def mean_pipeline(
 
 
 def main_mean(ts, postfix):
+    """calculate_all.py entry point: run mean_pipeline on `ts` and return
+    (forecast_df, best_params, metrics)."""
     return mean_pipeline(ts, max_period=50, train_ratio=0.8, postfix=postfix)
